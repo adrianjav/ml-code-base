@@ -1,0 +1,20 @@
+seed: 7
+device: cuda
+
+output:
+  interactive: false
+
+dataset:
+  who: []
+  params:
+    - [{probs: [0.25, 0.25, 0.25, 0.25]}]
+
+something:
+  that: [looks, {more: complicated}]
+  but:
+    - it
+    - may
+    - not
+    - be
+  the:
+    whole: truth
