@@ -43,6 +43,11 @@ class TestArguments(unittest.TestCase):
             args.load(file, scope='local')
         self.assertDictEqual(dict(args), self.settings_filename_dict, 'File load failed.')
 
+    def test_load_filename(self):
+        args = Arguments()
+        args.load(filename=self.settings_filename, scope='local')
+        self.assertDictEqual(dict(args), self.settings_filename_dict, 'Filename load failed.')
+
     def test_load_local_global(self):
         args1, args2 = Arguments(), Arguments()
 
@@ -119,6 +124,9 @@ class TestArguments(unittest.TestCase):
         # Local change of an integer
         args1.load({'seed': 5}, scope='local')
         self.assertNotEqual(args1, args2)
+
+        # Check that I can do nested accesses
+        self.assertEqual(args1.dataset.who, [])
 
 
 if __name__ == '__main__':

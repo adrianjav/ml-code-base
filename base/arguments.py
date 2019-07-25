@@ -15,8 +15,11 @@ class NestedNamespace(SimpleNamespace):
         Updates the arguments of the object. Nested dicts get casted into NestedNamespaces objects.
         :param kwargs: dictionary with the arguments
         """
+        parser = lambda s: s.replace(' ', '_')  # TODO it might be to be modified to accomplish attributes syntax
 
         for k, v in kwargs.items():
+            k = parser(k)
+
             if k in self.__dict__.keys():
                 if isinstance(v, dict):
                     # TODO decide whether or not this is allowed
@@ -73,19 +76,26 @@ class Arguments(object):
     def reset():
         Arguments.__shared_namespace = NestedNamespace()
 
-    def load(self, source: Any, scope: str = 'global') -> Arguments:
+    def load(self, source: Optional[Any] = None, filename: Optional[str] = None, scope: str = 'global') -> Arguments:
         """
         Load a file-like/string/dict object and reads all the arguments in there with an unsafe yaml loader.
 
         :param source: dict/file-like object from which to read the settings
+        :param filename Filename of the settings file. `filename` and `source` are incompatibles.
         :param scope: specify how to update the arguments: `global` | `local`
         :return itself
         """
+        assert (source or filename) and not (source and filename), 'Set one of "source" and "filename"'
 
-        if isinstance(source, dict):
-            args_dict = source
-        else:
-            args_dict = yaml.safe_load(source) or {}
+        if source:
+            if isinstance(source, dict):
+                args_dict = source
+            else:
+                args_dict = yaml.safe_load(source) or {}
+
+        if filename:
+            with open(filename, 'r') as file:
+                args_dict = yaml.safe_load(file) or {}
 
         if scope == 'global':
             self.namespace.update(**args_dict)
