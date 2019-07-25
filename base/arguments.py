@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, Optional
 from types import SimpleNamespace
 
@@ -6,22 +7,23 @@ import yaml
 
 class NestedNamespace(SimpleNamespace):
     def __init__(self, **kwargs):
-        super().__init__()
+        super(SimpleNamespace, self).__init__()
         self.update(**kwargs)
 
     def update(self, **kwargs) -> None:
         """
         Updates the arguments of the object. Nested dicts get casted into NestedNamespaces objects.
         :param kwargs: dictionary with the arguments
-        :return: itself
         """
 
         for k, v in kwargs.items():
             if k in self.__dict__.keys():
                 if isinstance(v, dict):
+                    # TODO decide whether or not this is allowed
                     assert isinstance(getattr(self, k), NestedNamespace), f'key "{k}"s is of type {type(getattr(self, k))}'
                     getattr(self, k).update(**v)
                 else:
+                    # TODO decide whether or not this is allowed
                     assert type(v) is type(getattr(self, k)), f'wrong type when trying to update "{k}"'
                     setattr(self, k, v)
             else:
@@ -52,6 +54,12 @@ class Arguments(object):
     def __getattr__(self, item):
         return self.namespace.__getattribute__(item)
 
+    # TODO I have to fix this so I can modify the namespace. For now this is an OK workaround.
+    def __setattr__(self, key, value):
+        if key != 'namespace':
+            raise ValueError('Use the "load" method to change attributes.')
+        object.__setattr__(self, key, value)
+
     def __iter__(self):
         return self.namespace.__iter__()
 
@@ -65,25 +73,29 @@ class Arguments(object):
     def reset():
         Arguments.__shared_namespace = NestedNamespace()
 
-    def load(self, source: Any, scope: str = 'global') -> None:
+    def load(self, source: Any, scope: str = 'global') -> Arguments:
         """
-        Load a file-like object (or dict) and reads all the arguments in there with an unsafe yaml loader.
+        Load a file-like/string/dict object and reads all the arguments in there with an unsafe yaml loader.
 
         :param source: dict/file-like object from which to read the settings
         :param scope: specify how to update the arguments: `global` | `local`
+        :return itself
         """
 
         if isinstance(source, dict):
             args_dict = source
         else:
-            args_dict = yaml.load(source, Loader=yaml.UnsafeLoader) or {}
+            args_dict = yaml.safe_load(source) or {}
 
         if scope == 'global':
             self.namespace.update(**args_dict)
         elif scope == 'local':
-            self.namespace = NestedNamespace(**args_dict)
+            self.namespace = NestedNamespace(**dict(self.namespace))
+            self.namespace.update(**args_dict)
         else:
             raise ValueError('mode should be `global` or `local`.')
+
+        return self
 
 
 # Example code

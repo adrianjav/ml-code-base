@@ -64,10 +64,11 @@ class TestArguments(unittest.TestCase):
         args5.load({'that': ['array']})  # Global change
         self.assertEqual(args5.that, args6.that, 'Failed global editing.')
 
-        args5.that = 'element'  # Local change
-        self.assertNotEqual(args5.that, args6.that)
+        # args5.that = 'element'  # This is not allowed
+        args5.load({'that': ['element']}, scope='local')  # Change local attributes like this
+        self.assertNotEqual(args5.that, args6.that)  # But you can read them like this
 
-        args6.load({'that': 'element'}, scope='local') # Batch local changes
+        args6.load({'that': ['element']}, scope='local') # Local changes
         self.assertNotEqual(args6.that, args7.that)
         self.assertEqual(args6.that, args5.that)
 
@@ -102,6 +103,22 @@ class TestArguments(unittest.TestCase):
         my_dict['something'].update(**{'that': ['looks', 'simple']})
         args.update(**update5)
         self.assertDictEqual(my_dict, dict(args))
+
+    def test_global_nonargument(self):
+        args1 = Arguments().load(self.settings_filename_dict)
+        args2 = Arguments()
+        self.assertEqual(args1, args2)
+
+        # checks that args1.seed = 10 outputs an error
+        self.assertRaises(ValueError, args1.__setattr__, 'seed', 10)
+
+        # Global change of an integer
+        args1.load({'seed': 10})
+        self.assertEqual(args1, args2)
+
+        # Local change of an integer
+        args1.load({'seed': 5}, scope='local')
+        self.assertNotEqual(args1, args2)
 
 
 if __name__ == '__main__':
