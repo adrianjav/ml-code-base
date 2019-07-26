@@ -7,7 +7,7 @@ import yaml
 
 class NestedNamespace(SimpleNamespace):
     def __init__(self, **kwargs):
-        super(SimpleNamespace, self).__init__()
+        super(NestedNamespace, self).__init__()
         self.update(**kwargs)
 
     def update(self, **kwargs) -> None:
@@ -22,11 +22,9 @@ class NestedNamespace(SimpleNamespace):
 
             if k in self.__dict__.keys():
                 if isinstance(v, dict):
-                    # TODO decide whether or not this is allowed
                     assert isinstance(getattr(self, k), NestedNamespace), f'key "{k}"s is of type {type(getattr(self, k))}'
                     getattr(self, k).update(**v)
                 else:
-                    # TODO decide whether or not this is allowed
                     assert type(v) is type(getattr(self, k)), f'wrong type when trying to update "{k}"'
                     setattr(self, k, v)
             else:
@@ -41,27 +39,25 @@ class NestedNamespace(SimpleNamespace):
 
 
 class Arguments(object):
-    __shared_namespace = NestedNamespace()
+    _shared_namespace = NestedNamespace()
 
     def __init__(self, path: Optional[str] = None, parent=None):
-        self.namespace = Arguments.__shared_namespace if parent is None else parent.namespace
+        object.__setattr__(self, 'namespace', parent or Arguments._shared_namespace)
+
         if path is not None:
             for key in path.split('.'):
                 nested_ns = getattr(self, key, None)
                 if not isinstance(nested_ns, NestedNamespace):
                     tree_desc = 'root.' + path[:path.find(key) + len(key)]
-                    raise ValueError(f'{tree_desc} do not exist in the arguments tree')
+                    raise ValueError(f'{tree_desc} does not exist in the arguments tree')
 
-                self.namespace = nested_ns
+                object.__setattr__(self, 'namespace', nested_ns)
 
     def __getattr__(self, item):
-        return self.namespace.__getattribute__(item)
+        return getattr(self.namespace, item)
 
-    # TODO I have to fix this so I can modify the namespace. For now this is an OK workaround.
     def __setattr__(self, key, value):
-        if key != 'namespace':
-            raise ValueError('Use the "load" method to change attributes.')
-        object.__setattr__(self, key, value)
+        raise ValueError('Use the "load" method to change attributes.')
 
     def __iter__(self):
         return self.namespace.__iter__()
@@ -74,7 +70,7 @@ class Arguments(object):
 
     @staticmethod
     def reset():
-        Arguments.__shared_namespace = NestedNamespace()
+        Arguments._shared_namespace = NestedNamespace()
 
     def load(self, source: Optional[Any] = None, filename: Optional[str] = None, scope: str = 'global') -> Arguments:
         """
@@ -100,7 +96,7 @@ class Arguments(object):
         if scope == 'global':
             self.namespace.update(**args_dict)
         elif scope == 'local':
-            self.namespace = NestedNamespace(**dict(self.namespace))
+            object.__setattr__(self, 'namespace', NestedNamespace(**dict(self.namespace)))
             self.namespace.update(**args_dict)
         else:
             raise ValueError('mode should be `global` or `local`.')
@@ -111,6 +107,8 @@ class Arguments(object):
 # Example code
 if __name__ == '__main__':
     args = Arguments()
+    print(Arguments._shared_namespace)
+    Arguments.reset()
     with open('../tests/example_settings.yaml', 'r') as file:
         args.load(file, scope='local')
     print(args.dataset)
