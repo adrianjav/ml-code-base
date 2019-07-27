@@ -77,6 +77,18 @@ class SharedTree(object):
     def reset(cls):
         cls._shared_namespace = NestedNamespace()
 
+    def _get_dict(self, source, filename) -> dict:
+        if isinstance(source, dict):
+            res = source
+        elif source:
+            res = yaml.safe_load(source) or {}
+        else:
+            with open(filename, 'r') as file:
+                res = yaml.safe_load(file) or {}
+
+        assert isinstance(res, dict)
+        return res
+
     def update(self, source: Optional[Any] = None, filename: Optional[str] = None, scope: str = 'global') -> SharedTree:
         """
         Load a file-like/string/dict object and reads all the arguments in there with an unsafe yaml loader.
@@ -88,15 +100,7 @@ class SharedTree(object):
         """
         assert (source or filename) and not (source and filename), 'Set one of "source" and "filename"'
 
-        if source:
-            if isinstance(source, dict):
-                args_dict = source
-            else:
-                args_dict = yaml.safe_load(source) or {}
-
-        if filename:
-            with open(filename, 'r') as file:
-                args_dict = yaml.safe_load(file) or {}
+        args_dict = self._get_dict(source, filename)
 
         if scope == 'global':
             self.namespace.update(**args_dict)
