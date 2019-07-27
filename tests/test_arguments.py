@@ -3,6 +3,7 @@ from io import StringIO
 from base.arguments import Arguments
 
 
+# TODO separate arguments from shared tree tests
 class TestArguments(unittest.TestCase):
 
     def setUp(self) -> None:
