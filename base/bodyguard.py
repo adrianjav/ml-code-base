@@ -10,8 +10,6 @@ class Opt(object):
 
 
 class Guarded(type):
-    _use_mro_trick = False
-
     class SafeLoadException(Exception):
         pass
 
@@ -22,7 +20,7 @@ class Guarded(type):
 
         def __init__(self, *args, _load=None, _save=None, **kwargs):
             type(self)._unique_id += 1  # For the same code the id should be the same
-            object.__setattr__(self, '_filename', f'{type(self).__name__}_{type(self)._unique_id}')
+            object.__setattr__(self, '_filename', f'{type(self).__qualname__}_{type(self)._unique_id}')
 
             _load = _load if _load is not None else Opt.load
             _save = _save if _save is not None else Opt.save
@@ -52,7 +50,13 @@ class Guarded(type):
 
         def __del__(self):
             if self._save:
-                self.save(self._filename)
+                try:
+                    self.save(self._filename)
+                except Exception:
+                    self_id = int(self._filename.split('_')[-1])
+                    print(f'An exception happened while backing up the object {type(self).__name__} (id={self_id})')
+                    raise
+
                 atexit.unregister(self._atexit)
                 object.__setattr__(self, '_save', False)
             getattr(super(Guarded.Guardian, self), '__del__', lambda: None)()
