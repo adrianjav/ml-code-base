@@ -18,11 +18,11 @@ class Guarded(type):
     class Guardian(object):
         @staticmethod
         def _atexit_template(self) -> None:
-            del self
+            self.__del__()
 
         def __init__(self, *args, _load=None, _save=None, **kwargs):
             type(self)._unique_id += 1  # For the same code the id should be the same
-            object.__setattr__(self, 'filename', f'{type(self).__name__}_{type(self)._unique_id}')
+            object.__setattr__(self, '_filename', f'{type(self).__name__}_{type(self)._unique_id}')
 
             _load = _load if _load is not None else Opt.load
             _save = _save if _save is not None else Opt.save
@@ -32,8 +32,8 @@ class Guarded(type):
                                                                                             'to be of type ' \
                                                                                             '"staticmethod" ' \
                                                                                             'or "classmethod"'
-                res = self.load(self.filename)
-                object.__setattr__(res, 'filename', f'{type(self).__name__}_{type(self)._unique_id}')
+                res = self.load(self._filename)
+                object.__setattr__(res, '_filename', f'{type(self).__name__}_{type(self)._unique_id}')
                 object.__setattr__(res, '_atexit', partial(Guarded.Guardian._atexit_template, res))
                 atexit.register(res._atexit)
 
@@ -52,8 +52,9 @@ class Guarded(type):
 
         def __del__(self):
             if self._save:
-                self.save(self.filename)
+                self.save(self._filename)
                 atexit.unregister(self._atexit)
+                object.__setattr__(self, '_save', False)
             getattr(super(Guarded.Guardian, self), '__del__', lambda: None)()
 
     def __init__(cls, name, bases, namespace, loader=None, saver=None):
@@ -61,7 +62,7 @@ class Guarded(type):
         if saver:
             setattr(cls, 'save', saver)
         if loader:
-            setattr(cls, 'load', loader)
+            setattr(cls, 'load', staticmethod(loader))
 
     def __call__(self, *args, **kwargs):
         try:
@@ -80,11 +81,12 @@ class Guarded(type):
         return super(Guarded, metacls).__new__(metacls, name, bases, namespace)
 
     def mro(self) -> List[type]:
-        Guarded._use_mro_trick = not Guarded._use_mro_trick  # TODO commentate
-        if Guarded._use_mro_trick:
-            return [Guarded.Guardian, ] + super(Guarded, self).mro()  # To ensure that I execute my code the first
-        else:
-            return super(Guarded, self).mro()
+        super_mro = super(Guarded, self).mro()
+        if Guarded.Guardian in super_mro:
+            super_mro.remove(Guarded.Guardian)
+
+        return [Guarded.Guardian] + super_mro
+
 
 ################
 # Example code #
@@ -96,13 +98,13 @@ if __name__ == '__main__':
 
     class Prueba(metaclass=Guarded):
         def __init__(self, a, b, c):
-            print('Prueba.__init__')
+            print(f'{type(self).__name__}.__init__')
             self.a = a
             self.b = b
             self.c = c
 
         def __del__(self):
-            print('Prueba.__del__')
+            print(f'{type(self).__name__}.__del__')
 
         @classmethod
         def load(cls, filename):
@@ -125,7 +127,7 @@ if __name__ == '__main__':
 
     def loadme(filename):
         print("loadme")
-        cls = DummyClass
+        cls = AnotherDummyClass
         self = cls.__new__(cls)
         self.a = 1
         self.b = 2
@@ -134,13 +136,13 @@ if __name__ == '__main__':
 
     class DummyClass(metaclass=Guarded, loader=loadme):
         def __init__(self, a, b, c):
-            print('Prueba.__init__')
+            print(f'{type(self).__name__}.__init__')
             self.a = a
             self.b = b
             self.c = c
 
         def __del__(self):
-            print('Prueba.__del__')
+            print(f'{type(self).__name__}.__del__')
             pass
 
         def save(self, filename):
@@ -171,3 +173,4 @@ if __name__ == '__main__':
             return instance
 
     a = AnotherDummyClass(1, 2, 3)
+    a.__del__()
