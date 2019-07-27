@@ -33,32 +33,32 @@ class TestArguments(unittest.TestCase):
 
     def test_load_stringio(self):
         args = Arguments()
-        args.load(StringIO(self.settings_str), scope='local')
+        args.update(StringIO(self.settings_str), scope='local')
         dict(args)
         self.assertDictEqual(dict(args), self.settings_dict, 'Casting to dict failed.')
 
     def test_load_file(self):
         args = Arguments()
         with open(self.settings_filename, 'r') as file:
-            args.load(file, scope='local')
-        self.assertDictEqual(dict(args), self.settings_filename_dict, 'File load failed.')
+            args.update(file, scope='local')
+        self.assertDictEqual(dict(args), self.settings_filename_dict, 'File update failed.')
 
     def test_load_filename(self):
         args = Arguments()
-        args.load(filename=self.settings_filename, scope='local')
-        self.assertDictEqual(dict(args), self.settings_filename_dict, 'Filename load failed.')
+        args.update(filename=self.settings_filename, scope='local')
+        self.assertDictEqual(dict(args), self.settings_filename_dict, 'Filename update failed.')
 
     def test_load_local_global(self):
         args1, args2 = Arguments(), Arguments()
 
-        args1.load(self.settings_str, scope='local')
-        args2.load(self.settings_str, scope='local')
-        self.assertEqual(args1, args2, 'Local load failed.')
+        args1.update(self.settings_str, scope='local')
+        args2.update(self.settings_str, scope='local')
+        self.assertEqual(args1, args2, 'Local update failed.')
 
         args3 = Arguments()
         self.assertEqual(dict(args3), {})
 
-        args3.load(self.settings_filename_dict, scope='global')
+        args3.update(self.settings_filename_dict, scope='global')
         args4 = Arguments()
         self.assertEqual(args3, args4)
 
@@ -66,14 +66,14 @@ class TestArguments(unittest.TestCase):
         args6 = Arguments(path='something')
         args7 = Arguments(path='something')
 
-        args5.load({'that': ['array']})  # Global change
+        args5.update({'that': ['array']})  # Global change
         self.assertEqual(args5.that, args6.that, 'Failed global editing.')
 
         # args5.that = 'element'  # This is not allowed
-        args5.load({'that': ['element']}, scope='local')  # Change local attributes like this
+        args5.update({'that': ['element']}, scope='local')  # Change local attributes like this
         self.assertNotEqual(args5.that, args6.that)  # But you can read them like this
 
-        args6.load({'that': ['element']}, scope='local') # Local changes
+        args6.update({'that': ['element']}, scope='local') # Local changes
         self.assertNotEqual(args6.that, args7.that)
         self.assertEqual(args6.that, args5.that)
 
@@ -85,32 +85,32 @@ class TestArguments(unittest.TestCase):
         my_dict = self.settings_filename_dict
 
         args = Arguments()
-        args.load(my_dict)
+        args.update(my_dict)
         self.assertDictEqual(my_dict, dict(args), 'Update method failed.')
 
         update1 = {'seed': 10, 'device': 'cpu'}
         my_dict.update(update1)
-        args.update(**update1)
+        args.update(update1)
         self.assertDictEqual(my_dict, dict(args), 'Update 1 failed.')
 
         update2 = {'seed': 'string'}
-        self.assertRaises(AssertionError, args.update, **update2)
+        self.assertRaises(AssertionError, args.update, update2)
 
         update3 = {'seed': {'this': 'is', 'a': 'dict'}}
-        self.assertRaises(AssertionError, args.update, **update3)
+        self.assertRaises(AssertionError, args.update, update3)
 
         update4 = {'dataset': {'who': [1, 2, 3], 'a': 'dict'}}
-        my_dict['dataset'].update(**{'who': [1, 2, 3], 'a': 'dict'})
-        args.update(**update4)
+        my_dict['dataset'].update({'who': [1, 2, 3], 'a': 'dict'})
+        args.update(update4)
         self.assertDictEqual(my_dict, dict(args))
 
         update5 = {'something': {'that': ['looks', 'simple']}}
-        my_dict['something'].update(**{'that': ['looks', 'simple']})
-        args.update(**update5)
+        my_dict['something'].update({'that': ['looks', 'simple']})
+        args.update(update5)
         self.assertDictEqual(my_dict, dict(args))
 
     def test_global_nonargument(self):
-        args1 = Arguments().load(self.settings_filename_dict)
+        args1 = Arguments().update(self.settings_filename_dict)
         args2 = Arguments()
         self.assertEqual(args1, args2)
 
@@ -118,11 +118,11 @@ class TestArguments(unittest.TestCase):
         self.assertRaises(ValueError, args1.__setattr__, 'seed', 10)
 
         # Global change of an integer
-        args1.load({'seed': 10})
+        args1.update({'seed': 10})
         self.assertEqual(args1, args2)
 
         # Local change of an integer
-        args1.load({'seed': 5}, scope='local')
+        args1.update({'seed': 5}, scope='local')
         self.assertNotEqual(args1, args2)
 
         # Check that I can do nested accesses

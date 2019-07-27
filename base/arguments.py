@@ -4,8 +4,11 @@ from types import SimpleNamespace
 
 import yaml
 
+# TODO from base.bodyguard import Guarded
 
-class NestedNamespace(SimpleNamespace):
+
+# TODO GUARDAR FICHERO CON EL INDICE DE LOS ELEMENTOS GUARDADOS
+class NestedNamespace(SimpleNamespace): # TODO THIS IS A THING metaclass=my_function()->metaclass):
     def __init__(self, **kwargs):
         super(NestedNamespace, self).__init__()
         self.update(**kwargs)
@@ -57,7 +60,7 @@ class Arguments(object):
         return getattr(self.namespace, item)
 
     def __setattr__(self, key, value):
-        raise ValueError('Use the "load" method to change attributes.')
+        raise ValueError('Use the "update" method to change attributes.')
 
     def __iter__(self):
         return self.namespace.__iter__()
@@ -72,7 +75,17 @@ class Arguments(object):
     def reset():
         Arguments._shared_namespace = NestedNamespace()
 
-    def load(self, source: Optional[Any] = None, filename: Optional[str] = None, scope: str = 'global') -> Arguments:
+    # @classmethod
+    # def load(cls, filename):  # TODO WIP
+    #     print(f'loading {cls.__name__} object from {filename}...')
+    #     self = cls.__new__(cls)
+    #     object.__setattr__(self, 'namespace', Arguments._shared_namespace)
+    #     return self
+    #
+    # def save(self, filename):  # TODO WIP
+    #     print(f'saving {type(self).__name__} object to {filename}...', id(self))
+
+    def update(self, source: Optional[Any] = None, filename: Optional[str] = None, scope: str = 'global') -> Arguments:
         """
         Load a file-like/string/dict object and reads all the arguments in there with an unsafe yaml loader.
 
@@ -110,7 +123,7 @@ if __name__ == '__main__':
     print(Arguments._shared_namespace)
     Arguments.reset()
     with open('../tests/example_settings.yaml', 'r') as file:
-        args.load(file, scope='local')
+        args.update(file, scope='local')
     print(args.dataset)
 
     args = Arguments('dataset', args)
