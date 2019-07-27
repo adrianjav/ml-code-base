@@ -1,8 +1,8 @@
 from collections.abc import Iterable
 from pathlib import Path
 
-from base.data_structures import SharedTree
-from base.utils import SideEffect
+from base.data_structures import NestedNamespace
+from base.utils import SideEffect, Options
 
 # From this class we are also going to have a single global variable directories which
 # we will take root directory like
@@ -17,27 +17,28 @@ from base.utils import SideEffect
 # We update it as dirs.update({'folder1': ['subfolder1', 'subfolder2']}) (add { root': '.'} in the function)
 # then, lazily create the folder as we access to them TODO configure it?
 
-class Opt(object):
-    create_dirs = False
+
+# metaclass tiene que coger los atributos,
+
+class GlobalOptions(metaclass=Options):
+    _opt_create_dirs = True
 
 
-class MkdirOnDemand(metaclass=SideEffect):
-    def __init__(self, val):
+class MkdirOnDemand(object):
+    def __init__(self, val, owner):
         self.val = val
+        self.owner = owner
 
     def side_effect(self):
-        if Opt.create_dirs:
+        if self.owner.create_dirs.value():
             Path(self.val).mkdir(parents=True, exist_ok=True)
         return self.val
 
 
-class Directories(SharedTree):
-    class SafeDirException(Exception):
-        pass
-
-    def __init__(self, root='.', *args, **kwargs):
-        super(Directories, self).__init__(*args, **kwargs)
-        object.__setattr__(self, '_root', root)
+class Directories(NestedNamespace, GlobalOptions):
+    def __init__(self, root='.'):
+        super(Directories, self).__init__()
+        self._root = root
 
     def _process_dirs(self, res, root: str) -> dict:
         assert isinstance(res, dict) or isinstance(res, Iterable), 'Wrong format.'
@@ -47,9 +48,9 @@ class Directories(SharedTree):
             if isinstance(v, dict) or isinstance(v, Iterable):
                 res[k] = self._process_dirs(v, root=f'{root}/{k}')
             else:
-                res[k] = MkdirOnDemand(f'{root}/{k}')
+                res[k] = MkdirOnDemand(f'{root}/{k}', self)
 
-        res.update({'root': MkdirOnDemand(root)})
+        res.update({'root': MkdirOnDemand(root, self)})
         return res
 
     def _get_dict(self, source, filename) -> dict:
@@ -57,15 +58,60 @@ class Directories(SharedTree):
         res = self._process_dirs(res, root=self._root)
         return res
 
+    @GlobalOptions.create_dirs(False)
+    def update(self, *args, **kwargs):
+        super(Directories, self).update(*args, **kwargs)
+
+    def __getattribute__(self, item):
+        res = super(Directories, self).__getattribute__(item)
+        if isinstance(res, MkdirOnDemand):
+            val = res.side_effect()
+            if val == self._root:
+                path = ['root']
+            else:
+                path = val[len(self._root)+1:].split('/')
+                if item == 'root':
+                    path += ['root']
+
+            dict_path = val
+            for i in range(1, len(path)+1):
+                dict_path = {path[-i]: dict_path}
+
+            super(Directories, self).update_from_dict(dict_path)
+            return val
+        return res
+
+
 
 ################
 # Example code #
 ################
 
+# TODO remove on completion
+
 if __name__ == '__main__':
+    import os.path;
     d = Directories(root='../outputs')
     d.update({'folder1': None, 'folder2': ['other']})
-    print(d)
-    print(d.root)
+    # print(d)
+
+    print(f'create_dirs={d.create_dirs.value()}')
+    with d.create_dirs(False):
+        print(f'create_dirs={d.create_dirs.value()}')
+        print(d.root)
+        print('d.root', os.path.exists(d.root))
+
+    print(f'create_dirs={d.create_dirs.value()}')
     print(d.folder1)
-    print(d.folder2.other)
+    print('folder1', os.path.exists(d.folder1))
+
+    @GlobalOptions.create_dirs(False)
+    def show_last_folder():
+        print(f'create_dirs={d.create_dirs.value()}')
+        print(d.folder2.other)
+
+    show_last_folder()
+
+    GlobalOptions.create_dirs.value(False)
+    print(f'create_dirs={d.create_dirs.value()}')
+    print('folder2', os.path.exists(d.folder2.root))

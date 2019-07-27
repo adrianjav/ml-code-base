@@ -1,10 +1,10 @@
-from .data_structures import SharedTree
+from base.data_structures import NestedNamespace
 
 # TODO from base.bodyguard import Guarded
 
 
-# TODO GUARDAR FICHERO CON EL INDICE DE LOS ELEMENTOS GUARDADOS
-class Arguments(SharedTree):
+# TODO GUARDAR FICHERO CON EL INDICE DE LOS ELEMENTOS GUARDADOS (I can check the ls of the directory)
+class Arguments(NestedNamespace):
     pass
     # @classmethod
     # def load(cls, filename):  # TODO WIP
@@ -14,18 +14,16 @@ class Arguments(SharedTree):
     #     return self
     #
     # def save(self, filename):  # TODO WIP
-    #     print(f'saving {type(self).__name__} object to {filename}...', id(self))
+    #     print(f1'saving {type(self).__name__} object to {filename}...', id(self))
 
 
 # Example code
 if __name__ == '__main__':
     args = Arguments()
-    print(id(args._shared_namespace))
-    print(Arguments._shared_namespace)
-    Arguments.reset()
-    with open('../tests/example_settings.yaml', 'r') as file:
-        args.update(file, scope='local')
-    print(args.dataset)
+    print(args)
 
-    args = Arguments('dataset', args)
+    with open('../tests/example_settings.yaml', 'r') as file:
+        args.update(file)
+
+    args = args.dataset
     print(args)
