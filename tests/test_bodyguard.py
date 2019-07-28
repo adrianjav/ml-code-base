@@ -1,8 +1,8 @@
 import unittest
-from base.bodyguard import Guarded, GlobalOptions  # TODO temporary
+from base.bodyguard import FailSafe, GlobalOptions  # TODO temporary
 
 
-class DummyClass(metaclass=Guarded):
+class DummyClass(metaclass=FailSafe):
     def __init__(self, a, b, c):
         super().__init__()
         # print('Prueba.__init__')
