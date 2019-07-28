@@ -1,3 +1,5 @@
+import sys
+
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -87,7 +89,6 @@ class Directories(NestedNamespace, GlobalOptions):
 # Example code #
 ################
 
-# TODO remove on completion
 
 if __name__ == '__main__':
     import os.path;
@@ -115,3 +116,4 @@ if __name__ == '__main__':
     GlobalOptions.create_dirs.value(False)
     print(f'create_dirs={d.create_dirs.value()}')
     print('folder2', os.path.exists(d.folder2.root))
+    sys.exit(0)

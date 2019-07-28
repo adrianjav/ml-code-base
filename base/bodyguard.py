@@ -1,31 +1,72 @@
+import sys
+import os.path  # TODO
 import inspect
 import atexit
-from functools import partial
-from typing import List
+from functools import partial, wraps
+from typing import List, Callable
+
+from base.utils import Options
 
 
-class Opt(object):
-    load = False
-    save = True
+def exit_hook(func):
+    @wraps(func)
+    def _exit_hook(code=0):
+        sys.exit_code = code
+        func(code)
+    return _exit_hook
 
 
-class Guarded(type):
+def except_hook(func):
+    @wraps(func)
+    def _except_hook(*args, **kwargs):
+        sys.exit_code = None
+        func(*args, **kwargs)
+    return _except_hook
+
+
+def exit_assert():
+    assert hasattr(sys, 'exit_code'), 'Make sure to call "sys.exit" in your program.'  # TODO exit function
+
+atexit.register(exit_assert)
+sys.exit = exit_hook(sys.exit)
+sys.excepthook = except_hook(sys.excepthook)
+
+
+class GlobalOptions(metaclass=Options):
+    _opt_load_on_init = False
+    _opt_save_on_del = True
+    _opt_remove_on_completion = False
+
+
+# TODO temporary
+def on_remove(self):
+    print('removing', self._filename)
+
+
+class Guarded(Options):
     class SafeLoadException(Exception):
         pass
 
-    class Guardian(object):
+    class Guardian(GlobalOptions):
         @staticmethod
         def _atexit_template(self) -> None:
-            self.__del__()
+            if sys.exit_code == 0 and self.remove_on_completion.value():
+                self.remove()
+            else:
+                self.__del__()
 
-        def __init__(self, *args, _load=None, _save=None, **kwargs):
+        @staticmethod
+        def _atexit_completion(self) -> None:
+            if sys.exit_code == 0:
+                if self.remove_on_completion.value():
+                    self.remove()
+
+        def __init__(self, *args, **kwargs):
             type(self)._unique_id += 1  # For the same code the id should be the same
             object.__setattr__(self, '_filename', f'{type(self).__qualname__}_{type(self)._unique_id}')
 
-            _load = _load if _load is not None else Opt.load
-            _save = _save if _save is not None else Opt.save
-
-            if _load:
+            if self.load_on_init.value():
+                assert isinstance(self.load, Callable), 'The "load" property has to be callable.'
                 assert not inspect.ismethod(self.load) or self.load.__self__ is type(self), 'the "load" method has ' \
                                                                                             'to be of type ' \
                                                                                             '"staticmethod" ' \
@@ -34,22 +75,22 @@ class Guarded(type):
                 object.__setattr__(res, '_filename', f'{type(self).__name__}_{type(self)._unique_id}')
                 object.__setattr__(res, '_atexit', partial(Guarded.Guardian._atexit_template, res))
                 atexit.register(res._atexit)
+                self.save_on_del.value(False)
 
-                object.__setattr__(self, '_save', False)
-                object.__setattr__(res, '_save', _save)
+                for attr in [v for v in dir(self) if v.startswith('_opt_')]:
+                    setattr(res, attr, getattr(self, attr))
 
                 e = Guarded.SafeLoadException()
                 e.res = res
                 raise e  # I know, but I have to avoid the subclasses to continue their initializations
 
-            object.__setattr__(self, '_save', _save)
             object.__setattr__(self, '_atexit', partial(Guarded.Guardian._atexit_template, self))
             atexit.register(self._atexit)
 
             super(Guarded.Guardian, self).__init__(*args, **kwargs)  # Multiple inheritance case
 
         def __del__(self):
-            if self._save:
+            if self.save_on_del.value():
                 try:
                     self.save(self._filename)
                 except Exception:
@@ -58,15 +99,22 @@ class Guarded(type):
                     raise
 
                 atexit.unregister(self._atexit)
-                object.__setattr__(self, '_save', False)
+                atexit.register(partial(Guarded.Guardian._atexit_completion, self))
+                self.save_on_del.value(False)
+                # self._opt_save_on_del = False
             getattr(super(Guarded.Guardian, self), '__del__', lambda: None)()
 
-    def __init__(cls, name, bases, namespace, loader=None, saver=None):
+    def __init__(cls, name, bases, namespace, loader=None, saver=None, remover=None):
         super(Guarded, cls).__init__(name, bases, namespace)
         if saver:
             setattr(cls, 'save', saver)
         if loader:
             setattr(cls, 'load', staticmethod(loader))
+
+        if remover:
+            setattr(cls, 'remove', staticmethod(remover))
+        elif not hasattr(cls, 'remove'):
+            setattr(cls, 'remove', on_remove)
 
     def __call__(self, *args, **kwargs):
         try:
@@ -76,20 +124,39 @@ class Guarded(type):
 
     @classmethod
     def __prepare__(mcs, name, bases, **kwargs):
+        if not any([issubclass(cls, Guarded.Guardian) for cls in bases]):
+            bases = (Guarded.Guardian,) + bases
         namespace = super(Guarded, mcs).__prepare__(name, bases, **kwargs)
         namespace.update({'_unique_id': 0})
         return namespace
 
     def __new__(metacls, name, bases, namespace, **kwargs):
+        if not any([issubclass(cls, Guarded.Guardian) for cls in bases]):
+            bases = (Guarded.Guardian,) + bases
         # assert not any([isinstance(b, Guarded) for b in bases]), f'A base class of {name} is already Guarded.'
         return super(Guarded, metacls).__new__(metacls, name, bases, namespace)
 
-    def mro(self) -> List[type]:
-        super_mro = super(Guarded, self).mro()
-        if Guarded.Guardian in super_mro:
-            super_mro.remove(Guarded.Guardian)
+    # TODO if i dont put this every class has to call super()init
+    # def mro(self) -> List[type]:
+    #     super_mro = super(Guarded, self).mro()
+    #     guardian_mro = Guarded.Guardian.mro()[:-1]
+    #
+    #     if Guarded.Guardian in super_mro:
+    #         super_mro.remove(Guarded.Guardian)
+    #
+    #     for cls in guardian_mro:
+    #         if cls in super_mro:
+    #             guardian_mro.remove(cls)
+    #
+    #     print(f'mro for {self.__name__}: {guardian_mro + super_mro}')
+    #     return guardian_mro + super_mro
 
-        return [Guarded.Guardian] + super_mro
+        # super_mro = super(Guarded, self).mro()
+        # if Guarded.Guardian in super_mro:
+        #     super_mro.remove(Guarded.Guardian)
+        #
+        # print(f'mro for {self.__name__}: {Guarded.Guardian.mro()[:-1] + super_mro}')
+        # return Guarded.Guardian.mro()[:-1] + super_mro
 
 
 ################
@@ -98,9 +165,12 @@ class Guarded(type):
 
 
 if __name__ == '__main__':
-    Opt.load = True
-
     class Prueba(metaclass=Guarded):
+        @classmethod
+        def __call__(cls, *args, **kwargs):
+            print('call prueba')
+            super().__call__(*args, **kwargs)
+
         def __init__(self, a, b, c):
             print(f'{type(self).__name__}.__init__')
             self.a = a
@@ -176,5 +246,8 @@ if __name__ == '__main__':
             instance.a = filename
             return instance
 
-    a = AnotherDummyClass(1, 2, 3)
-    a.__del__()
+    with GlobalOptions.load_on_init(True):
+        a = AnotherDummyClass(1, 2, 3)
+
+    #a.__del__()
+    sys.exit(0)

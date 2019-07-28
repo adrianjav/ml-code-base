@@ -57,8 +57,8 @@ class Options(type):
         for attr in [x for x in namespace if x.startswith('_opt_')]:
             setattr(cls, attr[len('_opt_'):], with_stmt(partial(getter, cls, attr)))
 
-    def __call__(self, *args, **kwargs):
-        instance = super(Options, self).__call__(*args, **kwargs)
+    def __call__(cls, *args, **kwargs):
+        instance = super(Options, cls).__call__(*args, **kwargs)
 
         def getter(self, name, value=None, reset=False):
             assert not reset or (reset and not value)
@@ -71,12 +71,16 @@ class Options(type):
 
             return getattr(self, name)
 
-        def real_value(self, name):
+        def real_value(self, name, value=None):
+            if value is not None:
+                setattr(self, name, value)
+            else:
+                value = getattr(self, name)
+
             supervalue = getattr(super(type(self), self), name[len('_opt_'):]).value()
-            value = getattr(self, name)
             return value if value is not None else supervalue
 
-        for attr in [x for x in dir(self) if x.startswith('_opt_')]:
+        for attr in [x for x in dir(cls) if x.startswith('_opt_')]:
             setattr(instance, attr, None)
             setattr(instance, attr[len('_opt_'):], with_stmt(partial(getter, instance, attr)))
             getattr(instance, attr[len('_opt_'):]).value = staticmethod(partial(real_value, instance, attr))

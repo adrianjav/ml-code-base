@@ -1,3 +1,3 @@
 from .arguments import Arguments
-from .bodyguard import Guarded, Opt
+from .bodyguard import Guarded, GlobalOptions
 
