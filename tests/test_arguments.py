@@ -1,6 +1,6 @@
 import unittest
 from io import StringIO
-from base.arguments import Arguments
+from mlsuite.arguments import Arguments
 
 
 class TestArguments(unittest.TestCase):

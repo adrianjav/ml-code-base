@@ -4,7 +4,7 @@ import atexit
 from functools import partial, wraps
 from typing import Callable
 
-from base.utils import Options
+from mlsuite.utils import Options
 
 
 # Code to ensure that there is an exit code that we can check when exiting (an act wrt it)
@@ -39,7 +39,7 @@ class GlobalOptions(metaclass=Options):
     _opt_load_on_init = False
     _opt_save_on_del = True
     _opt_remove_on_completion = False
-
+    # TODO _opt_failsafe_directory =
 
 # TODO temporary
 def on_remove(self):

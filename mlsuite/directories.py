@@ -3,8 +3,8 @@ import sys
 from collections.abc import Iterable
 from pathlib import Path
 
-from base.data_structures import NestedNamespace
-from base.utils import SideEffect, Options
+from mlsuite.data_structures import NestedNamespace
+from mlsuite.utils import Options
 
 # From this class we are also going to have a single global variable directories which
 # we will take root directory like
@@ -62,7 +62,7 @@ class Directories(NestedNamespace, GlobalOptions):
 
     @GlobalOptions.create_dirs(False)
     def update(self, *args, **kwargs):
-        super(Directories, self).update(*args, **kwargs)
+        return super(Directories, self).update(*args, **kwargs)
 
     def __getattribute__(self, item):
         res = super(Directories, self).__getattribute__(item)

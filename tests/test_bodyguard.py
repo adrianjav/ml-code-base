@@ -1,5 +1,5 @@
 import unittest
-from base.bodyguard import FailSafe, GlobalOptions  # TODO temporary
+from mlsuite.failsafe import FailSafe, GlobalOptions
 
 
 class DummyClass(metaclass=FailSafe):
