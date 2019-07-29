@@ -1,6 +1,11 @@
 import unittest
 from io import StringIO
+import sys
+
+import mlsuite
 from mlsuite.arguments import Arguments
+
+mlsuite.save_on_del.value(False)
 
 
 class TestArguments(unittest.TestCase):
@@ -53,7 +58,7 @@ class TestArguments(unittest.TestCase):
         self.assertEqual(args1, args2, 'Local update failed.')
 
         args3 = Arguments()
-        self.assertEqual(dict(args3), {})
+        self.assertEqual({}, dict(args3))
 
     def test_update(self):
         my_dict = self.settings_filename_dict
@@ -86,3 +91,4 @@ class TestArguments(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+    sys.exit(0)

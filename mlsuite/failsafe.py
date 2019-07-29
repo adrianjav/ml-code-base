@@ -1,3 +1,4 @@
+from pathlib import Path
 import sys
 import inspect
 import atexit
@@ -5,6 +6,7 @@ from functools import partial, wraps
 from typing import Callable, List
 
 from mlsuite.utils import Options
+from mlsuite import directories as dirs
 
 
 # Code to ensure that there is an exit code that we can check when exiting (an act wrt it)
@@ -36,16 +38,21 @@ sys.excepthook = except_hook(sys.excepthook)
 
 
 class GlobalOptions(metaclass=Options):
-    inherit_on_creation = True
+    _opt_inherit_on_creation = True
 
     _opt_load_on_init = False
     _opt_save_on_del = True
     _opt_remove_on_completion = False
-    # TODO _opt_failsafe_directory =
+    with dirs.create_dirs(False):
+        _opt_failsafe_folder = dirs.root
 
-# TODO temporary
+
 def on_remove(self):
-    print('removing', self._filename)
+    # print('removing', self._filename)
+    path = Path(self.failsafe_folder.value() + '/' + self._filename)
+    if path.exists() and path.is_file():
+        path.unlink()
+
 
 
 class FailSafe(Options):
@@ -65,6 +72,7 @@ class FailSafe(Options):
                 self.remove()
             else:
                 self.__del__()
+            self.save_on_del.value(False)
 
         @staticmethod
         def _atexit_completion(self) -> None:
@@ -72,31 +80,43 @@ class FailSafe(Options):
                 if self.remove_on_completion.value():
                     self.remove()
 
+        @classmethod
+        def reset(cls):
+            cls._unique_id = 0
+
         def __init__(self, *args, **kwargs):
             type(self)._unique_id += 1  # For the same version of the code the id should be the same
-            object.__setattr__(self, '_filename', f'{type(self).__qualname__}_{type(self)._unique_id}')
+            filename = f'{type(self).__qualname__}_{type(self)._unique_id}'
+            object.__setattr__(self, '_filename', filename)
 
-            if self.load_on_init.value():
+            path = Path(self.failsafe_folder.value() + '/' + self._filename)
+            if self.load_on_init.value() and path.exists() and path.is_file():
                 assert isinstance(self.load, Callable), 'The "load" property has to be callable.'
                 assert not inspect.ismethod(self.load) or self.load.__self__ is type(self), 'the "load" method has ' \
                                                                                             'to be of type ' \
                                                                                             '"staticmethod" ' \
                                                                                             'or "classmethod"'
-                res = self.load(self._filename)
-                object.__setattr__(res, '_filename', f'{type(self).__name__}_{type(self)._unique_id}')
-                self.__dict__.update(res.__dict__)  # TODO slots?
 
+                with GlobalOptions.inherit_on_creation(True):
+                    with GlobalOptions.load_on_init(False), GlobalOptions.save_on_del(False):
+                        res = self.load(str(path))
+                        object.__setattr__(res, '_filename', f'{type(self).__name__}_{type(self)._unique_id}')
+                        self.__dict__.update(res.__dict__)  # TODO slots?
+
+                        res._opt_save_on_del = False
+                        res.__del__()
             else:
                 super(FailSafe.Guardian, self).__init__(*args, **kwargs)
 
+            object.__setattr__(self, '_filename', filename)
             object.__setattr__(self, '_atexit', partial(FailSafe.Guardian._atexit_template, self))
             atexit.register(self._atexit)
 
-
         def __del__(self):
             if self.save_on_del.value():
+                print('trying to save', type(self).__name__)
                 try:
-                    self.save(self._filename)
+                    self.save(self.failsafe_folder.value() + '/' + self._filename)
                 except Exception:
                     self_id = int(self._filename.split('_')[-1])
                     print(f'An exception happened while backing up the object {type(self).__name__} (id={self_id})')
@@ -120,7 +140,7 @@ class FailSafe(Options):
 
     def __call__(self, *args, **kwargs):
         instance = super(FailSafe, self).__call__(*args, **kwargs)
-        if GlobalOptions.inherit_on_creation:
+        if self.inherit_on_creation.value():
             for attr in [v for v in dir(instance) if v.startswith('_opt_')]:
                 setattr(instance, attr, getattr(instance, attr[len('_opt_'):]).value())
         return instance

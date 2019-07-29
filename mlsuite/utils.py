@@ -1,4 +1,4 @@
-from functools import partialmethod, partial, wraps
+from functools import partial, wraps
 
 
 class SideEffect(type):

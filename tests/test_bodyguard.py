@@ -1,5 +1,11 @@
 import unittest
+import mlsuite
 from mlsuite.failsafe import FailSafe, GlobalOptions
+
+mlsuite.save_on_del.value(False)
+
+
+# TODO I have to change the way of choosing folders
 
 
 class DummyClass(metaclass=FailSafe):
@@ -21,10 +27,7 @@ class DummyClass(metaclass=FailSafe):
     @classmethod
     def load(cls, filename):
         # print(f'loading {cls.__name__} object from {filename}...')
-        self = cls.__new__(cls)
-        self.a = 1
-        self.b = 2
-        self.c = 3
+        self = DummyClass(1, 2, 3)
         return self
 
     def __str__(self):
@@ -45,7 +48,10 @@ class AnotherDummyClass(DummyClass):  # It inherits the metaclass flavour
 class TestBodyguard(unittest.TestCase):
 
     def setUp(self) -> None:
+        mlsuite.failsafe_folder.value('.dummy_saves')
         GlobalOptions.load_on_init.value(False)
+        DummyClass.reset()
+        AnotherDummyClass.reset()
 
     def test_init_global(self):
         obj = DummyClass(2, 3, 4)
@@ -79,9 +85,9 @@ class TestBodyguard(unittest.TestCase):
         obj2 = DummyClass(2, 3, 4)
         obj3 = AnotherDummyClass(1, 2, 3)
 
-        self.assertEqual('AnotherDummyClass_1', obj1.a)
+        self.assertEqual('.dummy_saves/AnotherDummyClass_1', obj1.a)
         self.assertEqual(1, obj2.a)
-        self.assertEqual('AnotherDummyClass_2', obj3.a)
+        self.assertEqual('.dummy_saves/AnotherDummyClass_2', obj3.a)
 
     # TODO keep adding tests, e.g., loader/saver/_load/_save
 

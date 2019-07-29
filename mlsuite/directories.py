@@ -37,10 +37,11 @@ class MkdirOnDemand(object):
         return self.val
 
 
-class Directories(NestedNamespace, GlobalOptions):
+class Directories(NestedNamespace, GlobalOptions):  # I can inherit from it since I don't plan to use dict/save
     def __init__(self, root='.'):
         super(Directories, self).__init__()
         self._root = root
+        self.update({})
 
     def _process_dirs(self, res, root: str) -> dict:
         assert isinstance(res, dict) or isinstance(res, Iterable), 'Wrong format.'
