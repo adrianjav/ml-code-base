@@ -2,7 +2,7 @@ import sys
 import inspect
 import atexit
 from functools import partial, wraps
-from typing import Callable
+from typing import Callable, List
 
 from mlsuite.utils import Options
 
@@ -36,6 +36,8 @@ sys.excepthook = except_hook(sys.excepthook)
 
 
 class GlobalOptions(metaclass=Options):
+    inherit_on_creation = True
+
     _opt_load_on_init = False
     _opt_save_on_del = True
     _opt_remove_on_completion = False
@@ -52,10 +54,6 @@ class FailSafe(Options):
     transparent way. Besides, it can be selected whether or not remove the files once the program has properly
     finished.
     """
-
-    class SafeLoadException(Exception):
-        pass
-
     class Guardian(GlobalOptions):
         """
         Class from which everyone with metaclass=FailSafe is going to inherit in a transparent way.
@@ -86,21 +84,14 @@ class FailSafe(Options):
                                                                                             'or "classmethod"'
                 res = self.load(self._filename)
                 object.__setattr__(res, '_filename', f'{type(self).__name__}_{type(self)._unique_id}')
-                object.__setattr__(res, '_atexit', partial(FailSafe.Guardian._atexit_template, res))
-                atexit.register(res._atexit)
-                self.save_on_del.value(False)
+                self.__dict__.update(res.__dict__)  # TODO slots?
 
-                for attr in [v for v in dir(self) if v.startswith('_opt_')]:
-                    setattr(res, attr, getattr(self, attr))
-
-                e = FailSafe.SafeLoadException()
-                e.res = res
-                raise e  # I know, but I have to avoid the subclasses to continue their initializations
+            else:
+                super(FailSafe.Guardian, self).__init__(*args, **kwargs)
 
             object.__setattr__(self, '_atexit', partial(FailSafe.Guardian._atexit_template, self))
             atexit.register(self._atexit)
 
-            super(FailSafe.Guardian, self).__init__(*args, **kwargs)
 
         def __del__(self):
             if self.save_on_del.value():
@@ -128,10 +119,11 @@ class FailSafe(Options):
             setattr(cls, 'remove', on_remove)
 
     def __call__(self, *args, **kwargs):
-        try:
-            return super(FailSafe, self).__call__(*args, **kwargs)
-        except FailSafe.SafeLoadException as e:  # Silent load case
-            return e.res
+        instance = super(FailSafe, self).__call__(*args, **kwargs)
+        if GlobalOptions.inherit_on_creation:
+            for attr in [v for v in dir(instance) if v.startswith('_opt_')]:
+                setattr(instance, attr, getattr(instance, attr[len('_opt_'):]).value())
+        return instance
 
     @classmethod
     def __prepare__(mcs, name, bases, **kwargs):
@@ -148,19 +140,19 @@ class FailSafe(Options):
         return super(FailSafe, metacls).__new__(metacls, name, bases, namespace)
 
     # TODO if i dont put this every class has to call super()init
-    # def mro(self) -> List[type]:
-    #     super_mro = super(Guarded, self).mro()
-    #     guardian_mro = Guarded.Guardian.mro()[:-1]
-    #
-    #     if Guarded.Guardian in super_mro:
-    #         super_mro.remove(Guarded.Guardian)
-    #
-    #     for cls in guardian_mro:
-    #         if cls in super_mro:
-    #             guardian_mro.remove(cls)
-    #
-    #     print(f'mro for {self.__name__}: {guardian_mro + super_mro}')
-    #     return guardian_mro + super_mro
+    def mro(self) -> List[type]:
+        super_mro = super(FailSafe, self).mro()
+        guardian_mro = FailSafe.Guardian.mro()[:-1]
+
+        if FailSafe.Guardian in super_mro:
+            super_mro.remove(FailSafe.Guardian)
+
+        for cls in guardian_mro:
+            if cls in super_mro:
+                guardian_mro.remove(cls)
+
+        #print(f'mro for {self.__name__}: {guardian_mro + super_mro}')
+        return guardian_mro + super_mro
 
 
 ################

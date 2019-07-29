@@ -9,6 +9,10 @@ arguments = Arguments()
 directories = Directories()
 
 
+def inherit_on_creation(value: bool):
+    fsOptions.inherit_on_creation = value
+
+
 def update_arguments(source: Optional[Any] = None, filename: Optional[str] = None):
     arguments.update(source, filename)
 
