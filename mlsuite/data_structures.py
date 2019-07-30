@@ -10,7 +10,7 @@ class NestedNamespace(SimpleNamespace):
     def __init__(self):
         super(NestedNamespace, self).__init__()
 
-    def _get_dict(self, source, filename) -> dict:
+    def get_dict(self, source, filename) -> dict:
         if isinstance(source, dict):
             res = source
         elif source:
@@ -58,7 +58,7 @@ class NestedNamespace(SimpleNamespace):
         """
         assert (source is not None or filename is not None) and not (source is None and filename is None), 'Set one of "source" and "filename"'
 
-        args_dict = self._get_dict(source, filename)
+        args_dict = self.get_dict(source, filename)
         self.update_from_dict(args_dict)
 
         return self

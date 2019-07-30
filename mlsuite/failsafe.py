@@ -163,7 +163,7 @@ class FailSafe(Options):
 
         return super(FailSafe, metacls).__new__(metacls, name, bases, namespace)
 
-    # TODO if i dont put this every class has to call super()init
+    # you need this to ensure that the __init__ of Guardian is the first to get executed.
     def mro(self) -> List[type]:
         super_mro = super(FailSafe, self).mro()
         guardian_mro = FailSafe.Guardian.mro()[:-1]

@@ -1,4 +1,5 @@
 import sys
+from typing import Optional, Any
 
 from collections.abc import Iterable
 from pathlib import Path
@@ -17,7 +18,7 @@ from mlsuite.utils import Options
 # any directory until someone is accessing to it
 #
 # We update it as dirs.update({'folder1': ['subfolder1', 'subfolder2']}) (add { root': '.'} in the function)
-# then, lazily create the folder as we access to them TODO configure it?
+# then, lazily create the folder as we access to them
 
 
 # metaclass tiene que coger los atributos,
@@ -26,32 +27,38 @@ class GlobalOptions(metaclass=Options):
     _opt_create_dirs = True
 
 
-class MkdirOnDemand(object):
-    def __init__(self, val, owner):
+class LazyDirectory(object):
+    def __init__(self, val):
         self.val = val
-        self.owner = owner
 
-    def side_effect(self):
-        if self.owner.create_dirs.value():
-            Path(self.val).mkdir(parents=True, exist_ok=True)
+    def mkdir(self, root, owner):
+        if owner.create_dirs.value():
+            path = f'{root}/{self.val}' if root is not None else self.val
+            Path(path).mkdir(parents=True, exist_ok=True)
         return self.val
 
 
-# TODO CHANGE DIRECTORY AS ARGUMENTS (TREE)
-class Directories(NestedNamespace, GlobalOptions):  # I can inherit from it since I don't plan to use dict/save
-    def __init__(self, root='.'):
+class Directories(GlobalOptions):  # I can inherit from it since I don't plan to use dict/save
+    def __init__(self, namespace=None, root='.'):
         super(Directories, self).__init__()
+        self.namespace = namespace or NestedNamespace()
+        self.namespace.update_from_dict({'root': root})  # Initialization
         self._root = root
-        self.update({})
 
-    # TODO I have to fix this so I can change the root (tree structure) (This shouldnt work well right now)
-    def root(self, path=None):
-        if path is None:
-            return self._root
+    def update_root(self, path):
+        def change_root_recursively(self, prev, new):
+            old_root = self.root
+            new_root = new + old_root[len(prev):]
+            self.namespace.update_from_dict({'root': new_root})
+
+            for k, v in self.namespace.__dict__.items():
+                if isinstance(v, NestedNamespace):
+                    change_root_recursively(v, prev, new)
+
+        change_root_recursively(self, self.root, path)
 
         self._root = path
         return self._root
-
 
     def _process_dirs(self, res, root: str) -> dict:
         assert isinstance(res, dict) or isinstance(res, Iterable), 'Wrong format.'
@@ -61,38 +68,35 @@ class Directories(NestedNamespace, GlobalOptions):  # I can inherit from it sinc
             if isinstance(v, dict) or isinstance(v, Iterable):
                 res[k] = self._process_dirs(v, root=f'{root}/{k}')
             else:
-                res[k] = MkdirOnDemand(f'{root}/{k}', self)
+                res[k] = LazyDirectory(k)
 
-        res.update({'root': MkdirOnDemand(root, self)})
-        return res
-
-    def _get_dict(self, source, filename) -> dict:
-        res = super(Directories, self)._get_dict(source, filename)
-        res = self._process_dirs(res, root=self._root)
+        res.update({'root': LazyDirectory(root)})
         return res
 
     @GlobalOptions.create_dirs(False)
-    def update(self, *args, **kwargs):
-        return super(Directories, self).update(*args, **kwargs)
+    def update(self, source: Optional[Any] = None, filename: Optional[str] = None):
+        assert (source is not None or filename is not None) and not (
+                    source is None and filename is None), 'Set one of "source" and "filename"'
 
-    def __getattribute__(self, item):
-        res = super(Directories, self).__getattribute__(item)
-        if isinstance(res, MkdirOnDemand):
-            val = res.side_effect()
-            if val == self._root:
-                path = ['root']
-            else:
-                path = val[len(self._root)+1:].split('/')
-                if item == 'root':
-                    path += ['root']
+        raw_dict = self.namespace.get_dict(source, filename)
+        root = raw_dict['root'] if 'root' in raw_dict.keys() else '.'
+        raw_dict = self._process_dirs(raw_dict, root)
+        self.namespace.update(raw_dict)
 
-            dict_path = val
-            for i in range(1, len(path)+1):
-                dict_path = {path[-i]: dict_path}
+    def __getattr__(self, item):
+        res = getattr(self.namespace, item)
 
-            super(Directories, self).update_from_dict(dict_path)
-            return val
+        if isinstance(res, NestedNamespace):
+            res = Directories(res, res.root)
+        elif isinstance(res, LazyDirectory):
+            val = res.mkdir(self.root, self) if item != 'root' else res.mkdir(None, self)
+            self.namespace.update_from_dict({item: val})
+            res = val
+
         return res
+
+    def __iter__(self):
+        return self.namespace.__iter__()
 
     def __str__(self):
         return self.root
