@@ -1,6 +1,7 @@
 import unittest
 import mlsuite
 from mlsuite.failsafe import FailSafe, GlobalOptions
+from mlsuite import directories as dirs
 
 mlsuite.save_on_del.value(False)
 
@@ -46,10 +47,12 @@ class AnotherDummyClass(DummyClass):  # It inherits the metaclass flavour
 
 
 class TestBodyguard(unittest.TestCase):
-
     def setUp(self) -> None:
-        mlsuite.failsafe_folder.value('.dummy_saves')
+        mlsuite.create_dirs.value(False)
+        dirs.update({'dummy_saves': []})  # TODO dots in directories
+        mlsuite.failsafe_folder.value(dirs.dummy_saves)
         GlobalOptions.load_on_init.value(False)
+
         DummyClass.reset()
         AnotherDummyClass.reset()
 
@@ -85,9 +88,9 @@ class TestBodyguard(unittest.TestCase):
         obj2 = DummyClass(2, 3, 4)
         obj3 = AnotherDummyClass(1, 2, 3)
 
-        self.assertEqual('.dummy_saves/AnotherDummyClass_1', obj1.a)
+        self.assertEqual('./dummy_saves/AnotherDummyClass_1', obj1.a)
         self.assertEqual(1, obj2.a)
-        self.assertEqual('.dummy_saves/AnotherDummyClass_2', obj3.a)
+        self.assertEqual('./dummy_saves/AnotherDummyClass_2', obj3.a)
 
     # TODO keep adding tests, e.g., loader/saver/_load/_save
 

@@ -7,6 +7,7 @@ from typing import Callable, List
 
 from mlsuite.utils import Options
 from mlsuite import directories as dirs
+from .directories import Directories
 
 
 # Code to ensure that there is an exit code that we can check when exiting (an act wrt it)
@@ -43,16 +44,14 @@ class GlobalOptions(metaclass=Options):
     _opt_load_on_init = False
     _opt_save_on_del = True
     _opt_remove_on_completion = False
-    with dirs.create_dirs(False):
-        _opt_failsafe_folder = dirs.root
+    _opt_failsafe_folder = dirs
 
 
 def on_remove(self):
     # print('removing', self._filename)
-    path = Path(self.failsafe_folder.value() + '/' + self._filename)
+    path = Path(self.path)
     if path.exists() and path.is_file():
         path.unlink()
-
 
 
 class FailSafe(Options):
@@ -84,27 +83,28 @@ class FailSafe(Options):
         def reset(cls):
             cls._unique_id = 0
 
+        @property
+        def path(self):
+            assert isinstance(self.failsafe_folder.value(), Directories), f'Expected type: {Directories.__name__}, Actual: {type(self.failsafe_folder.value())}'
+            return f'{str(self.failsafe_folder.value())}/{self._filename}'
+
         def __init__(self, *args, **kwargs):
             type(self)._unique_id += 1  # For the same version of the code the id should be the same
             filename = f'{type(self).__qualname__}_{type(self)._unique_id}'
             object.__setattr__(self, '_filename', filename)
 
-            path = Path(self.failsafe_folder.value() + '/' + self._filename)
-            if self.load_on_init.value() and path.exists() and path.is_file():
-                assert isinstance(self.load, Callable), 'The "load" property has to be callable.'
-                assert not inspect.ismethod(self.load) or self.load.__self__ is type(self), 'the "load" method has ' \
-                                                                                            'to be of type ' \
-                                                                                            '"staticmethod" ' \
-                                                                                            'or "classmethod"'
-
+            if self.load_on_init.value():
                 with GlobalOptions.inherit_on_creation(True):
                     with GlobalOptions.load_on_init(False), GlobalOptions.save_on_del(False):
-                        res = self.load(str(path))
-                        object.__setattr__(res, '_filename', f'{type(self).__name__}_{type(self)._unique_id}')
-                        self.__dict__.update(res.__dict__)  # TODO slots?
+                        res = self.load(self.path)
+                        if res is not None:
+                            object.__setattr__(res, '_filename', f'{type(self).__name__}_{type(self)._unique_id}')
+                            self.__dict__.update(res.__dict__)  # TODO slots?
 
-                        res._opt_save_on_del = False
-                        res.__del__()
+                            res._opt_save_on_del = False
+                            res.__del__()
+                        else:
+                            super(FailSafe.Guardian, self).__init__(*args, **kwargs)
             else:
                 super(FailSafe.Guardian, self).__init__(*args, **kwargs)
 
@@ -116,7 +116,7 @@ class FailSafe(Options):
             if self.save_on_del.value():
                 print('trying to save', type(self).__name__)
                 try:
-                    self.save(self.failsafe_folder.value() + '/' + self._filename)
+                    self.save(self.path)
                 except Exception:
                     self_id = int(self._filename.split('_')[-1])
                     print(f'An exception happened while backing up the object {type(self).__name__} (id={self_id})')
@@ -137,6 +137,10 @@ class FailSafe(Options):
             setattr(cls, 'remove', staticmethod(remover))
         elif not hasattr(cls, 'remove'):
             setattr(cls, 'remove', on_remove)
+
+        assert isinstance(cls.load, Callable), 'The "load" property has to be callable.'
+        assert not inspect.ismethod(cls.load) or cls.load.__self__ is cls, 'the "load" method has to be of type ' \
+                                                                           '"staticmethod" or "classmethod"'
 
     def __call__(self, *args, **kwargs):
         instance = super(FailSafe, self).__call__(*args, **kwargs)

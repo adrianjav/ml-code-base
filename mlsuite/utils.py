@@ -20,15 +20,17 @@ class SideEffect(type):
 def with_stmt(outer_func):
     class CM(object):
         def __init__(self, *args, **kwargs):
-            self.old_value = outer_func()
             self.args = args
             self.kwargs = kwargs
+            self.old_value = []
 
         def __enter__(self):
+            self.old_value.append(outer_func())
             outer_func(*self.args, **self.kwargs)
 
         def __exit__(self, exc_type, exc_val, exc_tb):
-            outer_func(self.old_value) if self.old_value is not None else outer_func(reset=True)
+            prev_value = self.old_value.pop()
+            outer_func(prev_value) if prev_value is not None else outer_func(reset=True)
             return False
 
         def __call__(self, inner_func):
@@ -71,7 +73,12 @@ class Options(type):
 
             return getattr(self, name)
 
-        def real_value(self, name, value=None):
+        def real_value(self, name, value=None, reset=None):
+            assert not reset or (reset and not value)
+
+            if reset:
+                setattr(self, name, None)
+
             if value is not None:
                 setattr(self, name, value)
             else:

@@ -37,16 +37,26 @@ class MkdirOnDemand(object):
         return self.val
 
 
+# TODO CHANGE DIRECTORY AS ARGUMENTS (TREE)
 class Directories(NestedNamespace, GlobalOptions):  # I can inherit from it since I don't plan to use dict/save
     def __init__(self, root='.'):
         super(Directories, self).__init__()
         self._root = root
         self.update({})
 
+    # TODO I have to fix this so I can change the root (tree structure) (This shouldnt work well right now)
+    def root(self, path=None):
+        if path is None:
+            return self._root
+
+        self._root = path
+        return self._root
+
+
     def _process_dirs(self, res, root: str) -> dict:
         assert isinstance(res, dict) or isinstance(res, Iterable), 'Wrong format.'
 
-        res = res if isinstance(res, dict) else {k: None for k in res}
+        res = res if isinstance(res, dict) else {k: [] for k in res}
         for k, v in res.items():
             if isinstance(v, dict) or isinstance(v, Iterable):
                 res[k] = self._process_dirs(v, root=f'{root}/{k}')
@@ -84,6 +94,8 @@ class Directories(NestedNamespace, GlobalOptions):  # I can inherit from it sinc
             return val
         return res
 
+    def __str__(self):
+        return self.root
 
 
 ################

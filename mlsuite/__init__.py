@@ -22,7 +22,7 @@ class failsafe_folder(fsOptions.failsafe_folder): pass
 
 from .arguments import Arguments
 
-with fsOptions.inherit_on_creation(True):
+with fsOptions.inherit_on_creation(True), dirsOptions.create_dirs(False):
     with fsOptions.load_on_init(True), fsOptions.save_on_del(True), fsOptions.remove_on_completion(True):
         arguments = Arguments()
 

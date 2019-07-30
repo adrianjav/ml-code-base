@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Any, Optional
+from pathlib import Path
 
 import yaml
 
@@ -14,15 +15,20 @@ class Arguments(metaclass=FailSafe):
         self.namespace = namespace or NestedNamespace()
 
     @classmethod
-    def load(cls, filename):
-        with open(filename, 'r') as file:
-            raw_args = yaml.safe_load(file)
+    def load(cls, path):
+        path = Path(path)
+        raw_args = None
 
-        self = Arguments()
-        if raw_args:
+        if path.exists() and path.is_file():
+            with path.open('r') as file:
+                raw_args = yaml.safe_load(file)
+
+        if raw_args is None:
+            return None
+        else:
+            self = Arguments()
             self.update_from_dict(raw_args)
-
-        return self
+            return self
 
     def save(self, filename):
         with open(filename, 'w') as file:
