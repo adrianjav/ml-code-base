@@ -1,22 +1,6 @@
 from functools import partial, wraps
 
 
-class SideEffect(type):
-    def __call__(cls, *args, **kwargs):
-        instance = super(SideEffect, cls).__call__(*args, **kwargs)
-        return instance.side_effect()
-
-# a = A()
-# print(a.create_dirs.value())
-# print(a.create_dirs.value(False))
-# print(a.create_dirs.value())
-# with a.create_dirs(False):
-#     print(a.create_dirs.value())
-#     with a.create_dirs(reset=True):
-#         print(a.create_dirs.value())
-# print(a.create_dirs(reset=True))
-
-
 def with_stmt(outer_func):
     class CM(object):
         def __init__(self, *args, **kwargs):

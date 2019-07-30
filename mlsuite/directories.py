@@ -29,12 +29,21 @@ class GlobalOptions(metaclass=Options):
 
 class LazyDirectory(object):
     def __init__(self, val):
+        assert isinstance(val, str)
         self.val = val
 
     def mkdir(self, root, owner):
         if owner.create_dirs.value():
             path = f'{root}/{self.val}' if root is not None else self.val
             Path(path).mkdir(parents=True, exist_ok=True)
+            return self.val
+        else:
+            return self
+
+    def __repr__(self):
+        return f'l\'{self.val}\''
+
+    def __str__(self):
         return self.val
 
 
@@ -42,20 +51,33 @@ class Directories(GlobalOptions):  # I can inherit from it since I don't plan to
     def __init__(self, namespace=None, root='.'):
         super(Directories, self).__init__()
         self.namespace = namespace or NestedNamespace()
-        self.namespace.update_from_dict({'root': root})  # Initialization
+        self.namespace.update_from_dict({'root': LazyDirectory(root)})  # Initialization
+        self._root = root
+
+    def reset(self, namespace=None, root='.'):
+        self.namespace = namespace or NestedNamespace()
+        self.namespace.update_from_dict({'root': LazyDirectory(root)})  # Initialization
         self._root = root
 
     def update_root(self, path):
         def change_root_recursively(self, prev, new):
             old_root = self.root
-            new_root = new + old_root[len(prev):]
-            self.namespace.update_from_dict({'root': new_root})
+            is_lazy = isinstance(old_root, LazyDirectory)
 
-            for k, v in self.namespace.__dict__.items():
+            with GlobalOptions.create_dirs(False):
+                if is_lazy: old_root = str(old_root)
+            new_root = new + old_root[len(prev):]
+
+            if is_lazy:
+                self.update_from_dict({'root': LazyDirectory(new_root)})
+            else:
+                self.update_from_dict({'root': new_root})
+
+            for k, v in self.__dict__.items():
                 if isinstance(v, NestedNamespace):
                     change_root_recursively(v, prev, new)
 
-        change_root_recursively(self, self.root, path)
+        change_root_recursively(self.namespace, self.root, path)
 
         self._root = path
         return self._root
@@ -87,11 +109,11 @@ class Directories(GlobalOptions):  # I can inherit from it since I don't plan to
         res = getattr(self.namespace, item)
 
         if isinstance(res, NestedNamespace):
-            res = Directories(res, res.root)
+            res = Directories(res, str(res.root))
         elif isinstance(res, LazyDirectory):
             val = res.mkdir(self.root, self) if item != 'root' else res.mkdir(None, self)
             self.namespace.update_from_dict({item: val})
-            res = val
+            res = str(val)
 
         return res
 
@@ -99,7 +121,10 @@ class Directories(GlobalOptions):  # I can inherit from it since I don't plan to
         return self.namespace.__iter__()
 
     def __str__(self):
-        return self.root
+        return str(self.root)
+
+    def __repr__(self):
+        return f'd\'{str(self.root)}\''
 
 
 ################
