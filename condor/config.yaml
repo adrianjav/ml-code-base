@@ -1,0 +1,11 @@
+directories:
+  root: .condor_manager
+  init: {}
+  create dirs: true
+
+failsafe:
+  inherit on creation: false
+  load on init: true
+  save on del: true
+  remove on completion: true
+  folder: root
