@@ -48,6 +48,9 @@ class TestArguments(unittest.TestCase):
 
             Path('folder1').rmdir()
 
+    def test_dots(self):
+        dirs.update({'.hidden': []})
+        self.assertEqual('./.hidden', str(dirs._H_hidden))
 
 if __name__ == '__main__':
     unittest.main()

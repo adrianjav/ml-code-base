@@ -23,7 +23,7 @@ class NestedNamespace(SimpleNamespace):
         return res
 
     def update_from_dict(self, my_dict):
-        parser = lambda s: s.replace(' ', '_')  # TODO it might need to be modified to accomplish attributes syntax
+        parser = lambda s: s.replace(' ', '_').replace('.', '_H_')  # TODO it might need to be modified
 
         for k, v in my_dict.items():
             k = parser(k)

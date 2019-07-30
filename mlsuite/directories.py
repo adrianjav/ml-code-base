@@ -101,7 +101,7 @@ class Directories(GlobalOptions):  # I can inherit from it since I don't plan to
                     source is None and filename is None), 'Set one of "source" and "filename"'
 
         raw_dict = self.namespace.get_dict(source, filename)
-        root = raw_dict['root'] if 'root' in raw_dict.keys() else '.'
+        root = raw_dict['root'] if 'root' in raw_dict.keys() else self._root
         raw_dict = self._process_dirs(raw_dict, root)
         self.namespace.update(raw_dict)
 
