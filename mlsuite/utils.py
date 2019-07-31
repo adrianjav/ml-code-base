@@ -1,6 +1,20 @@
 from functools import partial, wraps
 
 
+def args_to_str(sentence):
+    if not sentence.startswith('$args'):
+        return sentence
+
+    from . import arguments as args
+    from .data_structures import NestedNamespace
+
+    new_sentence = args
+    for s in sentence.split('.')[1:]:
+        new_sentence = getattr(new_sentence, s)
+    assert not isinstance(new_sentence, NestedNamespace)
+    return new_sentence
+
+
 def with_stmt(outer_func):
     class CM(object):
         def __init__(self, *args, **kwargs):

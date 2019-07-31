@@ -1,0 +1,21 @@
+# Add here everything that you want as default arguments
+# arguments:
+#  timestamp:
+
+# Initial configuration for the directories
+directories:
+  root: .outputs
+  init:
+    outputs:
+      $args.timestamp:
+        - plots
+        - checkpoints
+  create dirs: true
+
+# Initial configuration for the failsafe system
+failsafe:
+  inherit on creation: false
+  load on init: true
+  save on del: true
+  remove on completion: false
+  folder: outputs/$args.timestamp/checkpoints

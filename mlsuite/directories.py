@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from mlsuite.data_structures import NestedNamespace
-from mlsuite.utils import Options
+from mlsuite.utils import Options, args_to_str
 
 # From this class we are also going to have a single global variable directories which
 # we will take root directory like
@@ -55,10 +55,12 @@ class Directories(GlobalOptions):  # I can inherit from it since I don't plan to
         self._root = root
 
     def reset(self, namespace=None, root='.'):
-        self.namespace = namespace or NestedNamespace()
-        self.namespace.update_from_dict({'root': LazyDirectory(root)})  # Initialization
         self._root = root
+        self.namespace = namespace or NestedNamespace()
 
+        self.update({})
+
+    @GlobalOptions.create_dirs(False)
     def update_root(self, path):
         def change_root_recursively(self, prev, new):
             old_root = self.root
@@ -66,34 +68,38 @@ class Directories(GlobalOptions):  # I can inherit from it since I don't plan to
 
             with GlobalOptions.create_dirs(False):
                 if is_lazy: old_root = str(old_root)
+
             new_root = new + old_root[len(prev):]
+            self._root = new_root
+            self.update({})
+            # if is_lazy:
+            #     self.update_from_dict({'root': LazyDirectory(new_root)})
+            # else:
+            #     self.update_from_dict({'root': new_root})
 
-            if is_lazy:
-                self.update_from_dict({'root': LazyDirectory(new_root)})
-            else:
-                self.update_from_dict({'root': new_root})
-
-            for k, v in self.__dict__.items():
-                if isinstance(v, NestedNamespace):
+            for v in [getattr(self, k) for k in dict(self.namespace).keys()]:
+                if isinstance(v, Directories):
                     change_root_recursively(v, prev, new)
 
-        change_root_recursively(self.namespace, self.root, path)
+        change_root_recursively(self, self.root, path)
 
-        self._root = path
         return self._root
 
     def _process_dirs(self, res, root: str) -> dict:
         assert isinstance(res, dict) or isinstance(res, Iterable), 'Wrong format.'
 
         res = res if isinstance(res, dict) else {k: [] for k in res}
+        new_res = {}
         for k, v in res.items():
-            if isinstance(v, dict) or isinstance(v, Iterable):
-                res[k] = self._process_dirs(v, root=f'{root}/{k}')
-            else:
-                res[k] = LazyDirectory(k)
+            k = args_to_str(k)
 
-        res.update({'root': LazyDirectory(root)})
-        return res
+            if isinstance(v, dict) or isinstance(v, Iterable):
+                new_res[k] = self._process_dirs(v, root=f'{root}/{k}')
+            else:
+                new_res[k] = LazyDirectory(k)
+
+        new_res.update({'root': LazyDirectory(root)})
+        return new_res
 
     @GlobalOptions.create_dirs(False)
     def update(self, source: Optional[Any] = None, filename: Optional[str] = None):
@@ -104,6 +110,7 @@ class Directories(GlobalOptions):  # I can inherit from it since I don't plan to
         root = raw_dict['root'] if 'root' in raw_dict.keys() else self._root
         raw_dict = self._process_dirs(raw_dict, root)
         self.namespace.update(raw_dict)
+        self._root = str(self.root)
 
     def __getattr__(self, item):
         res = getattr(self.namespace, item)

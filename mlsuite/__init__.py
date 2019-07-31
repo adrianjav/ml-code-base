@@ -1,5 +1,8 @@
+import os
+from datetime import datetime
 from typing import Optional, Any
 
+from .utils import args_to_str
 from .data_structures import NestedNamespace
 from .directories import Directories, GlobalOptions as dirsOptions
 
@@ -26,6 +29,7 @@ from .arguments import Arguments
 with fsOptions.inherit_on_creation(True):
     with fsOptions.load_on_init(True), fsOptions.save_on_del(True), fsOptions.remove_on_completion(True):
         arguments = Arguments()
+        arguments.timestamp = datetime.today().strftime('%Y-%m-%d-%H:%M:%S')
 
 
 def update_arguments(source: Optional[Any] = None, filename: Optional[str] = None):
@@ -39,30 +43,36 @@ def update_directories(source: Optional[Any] = None, filename: Optional[str] = N
 def load_config(source: Optional[Any] = None, filename: Optional[str] = None):
     assert (source is None or filename is None) and (source is not None or filename is not None)
 
-    config = NestedNamespace().update(source, filename)
+    config = NestedNamespace().get_dict(source, filename)
 
-    if hasattr(config, 'arguments'):
-        pass
+    if 'arguments' in config.keys():
+        arguments.update(config['arguments'])
 
-    if hasattr(config, 'directories'):
-        c_dirs = config.directories
-        if hasattr(c_dirs,'root'): directories.update_root(c_dirs.root)
-        if hasattr(c_dirs, 'init'): directories.update(dict(c_dirs.init))
-        if hasattr(c_dirs, 'create_dirs'): dirsOptions._opt_create_dirs = c_dirs.create_dirs
+    if 'directories' in config.keys():
+        c_dirs = config['directories']
+        if 'root' in c_dirs.keys(): directories.update_root(c_dirs['root'])
+        if 'init' in c_dirs.keys(): directories.update(c_dirs['init'])
+        if 'create_dirs' in c_dirs.keys(): dirsOptions._opt_create_dirs = c_dirs['create_dirs']
 
-    if hasattr(config, 'failsafe'):
-        c_fs = config.failsafe
-        if hasattr(c_fs, 'inherit_on_creation'): fsOptions._opt_inherit_on_creation = c_fs.inherit_on_creation
-        if hasattr(c_fs, 'load_on_init'): fsOptions._opt_load_on_init = c_fs.load_on_init
-        if hasattr(c_fs, 'save_on_del'): fsOptions._opt_save_on_del= c_fs.save_on_del
-        if hasattr(c_fs, 'remove_on_completion'): fsOptions._opt_remove_on_completion = c_fs.remove_on_completion
-        if hasattr(c_fs, 'folder'):
+    if 'failsafe' in config.keys():
+        c_fs = config['failsafe']
+        if 'inherit_on_creation' in c_fs.keys(): fsOptions._opt_inherit_on_creation = c_fs['inherit_on_creation']
+        if 'load_on_init' in c_fs.keys(): fsOptions._opt_load_on_init = c_fs['load_on_init']
+        if 'save_on_del' in c_fs.keys(): fsOptions._opt_save_on_del= c_fs['save_on_del']
+        if 'remove_on_completion' in c_fs.keys(): fsOptions._opt_remove_on_completion = c_fs['remove_on_completion']
+        if 'folder' in c_fs.keys():
             with dirsOptions.create_dirs(False):
                 folder = directories
-                for s in c_fs.folder.split('/'):
-                    folder = getattr(directories, s)
+                for s in c_fs['folder'].split('/'):
+                    s = args_to_str(s)
+                    if s != 'root':  # root is a string and the previoius folder already gets it
+                        folder = getattr(folder, s)
 
             fsOptions._opt_failsafe_folder = folder
+
+
+# Default configuration loaded from the config.yaml file in this directory
+load_config(filename=f'{os.path.dirname(os.path.abspath(__file__))}/config.yaml')
 
 
 __all__ = ['arguments', 'directories', 'FailSafe', 'update_arguments', 'update_directories', 'inherit_on_creation']
