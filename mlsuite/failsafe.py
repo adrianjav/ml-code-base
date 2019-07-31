@@ -2,7 +2,7 @@ from pathlib import Path
 import sys
 import inspect
 import atexit
-from functools import partial, wraps
+from functools import partial, wraps, partialmethod
 from typing import Callable, List
 
 from mlsuite.utils import Options
@@ -88,6 +88,10 @@ class FailSafe(Options):
             return f'{str(self.failsafe_folder.value())}/{self._filename}'
 
         def __init__(self, *args, **kwargs):
+            super(FailSafe.Guardian, self).__init__(*args, **kwargs)
+
+        @staticmethod
+        def init_or_load(self, __init__, *args, **kwargs):
             type(self)._unique_id += 1  # For the same version of the code the id should be the same
             filename = f'{type(self).__qualname__}_{type(self)._unique_id}'
             if hasattr(self, 'setup_filename'):
@@ -105,9 +109,11 @@ class FailSafe(Options):
                             res._opt_save_on_del = False
                             res.__del__()
                         else:
-                            super(FailSafe.Guardian, self).__init__(*args, **kwargs)
+                            # super(FailSafe.Guardian, self).__init__(*args, **kwargs)
+                            __init__(self, *args, **kwargs)
             else:
-                super(FailSafe.Guardian, self).__init__(*args, **kwargs)
+                # super(FailSafe.Guardian, self).__init__(*args, **kwargs)
+                __init__(self, *args, **kwargs)
 
             object.__setattr__(self, '_filename', filename)
             object.__setattr__(self, '_atexit', partial(FailSafe.Guardian._atexit_template, self))
@@ -115,15 +121,16 @@ class FailSafe(Options):
 
         def __del__(self):
             if self.save_on_del.value():
-                print('trying to save', type(self).__name__)
+                # print('trying to save', type(self).__name__)
                 try:
                     self.save(self.path)
                 except Exception:
                     self_id = int(self._filename.split('_')[-1])
                     print(f'An exception happened while backing up the object {type(self).__name__} (id={self_id})')
+                    self.remove()
                     raise
 
-                atexit.unregister(self._atexit)
+#                atexit.unregister(self._atexit)
                 atexit.register(partial(FailSafe.Guardian._atexit_completion, self))
                 self.save_on_del.value(False)
 
@@ -131,6 +138,9 @@ class FailSafe(Options):
 
     def __init__(cls, name, bases, namespace, loader=None, saver=None, remover=None):
         super(FailSafe, cls).__init__(name, bases, namespace)
+
+        cls.__init__ = partialmethod(FailSafe.Guardian.init_or_load, cls.__init__)
+
         if saver: setattr(cls, 'save', saver)
         if loader: setattr(cls, 'load', staticmethod(loader))
 
@@ -145,9 +155,11 @@ class FailSafe(Options):
 
     def __call__(self, *args, **kwargs):
         instance = super(FailSafe, self).__call__(*args, **kwargs)
+
         if self.inherit_on_creation.value():
             for attr in [v for v in dir(instance) if v.startswith('_opt_')]:
                 setattr(instance, attr, getattr(instance, attr[len('_opt_'):]).value())
+
         return instance
 
     @classmethod
@@ -163,22 +175,6 @@ class FailSafe(Options):
             bases = (FailSafe.Guardian,) + bases
 
         return super(FailSafe, metacls).__new__(metacls, name, bases, namespace)
-
-    # you need this to ensure that the __init__ of Guardian is the first to get executed.
-    def mro(self) -> List[type]:
-        super_mro = super(FailSafe, self).mro()
-        guardian_mro = FailSafe.Guardian.mro()[:-1]
-
-        if FailSafe.Guardian in super_mro:
-            super_mro.remove(FailSafe.Guardian)
-
-        for cls in guardian_mro:
-            if cls in super_mro:
-                guardian_mro.remove(cls)
-
-        #print(f'mro for {self.__name__}: {guardian_mro + super_mro}')
-        return guardian_mro + super_mro
-
 
 ################
 # Example code #

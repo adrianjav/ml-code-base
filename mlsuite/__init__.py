@@ -29,7 +29,7 @@ from .arguments import Arguments
 # with fsOptions.inherit_on_creation(True):
 #     with fsOptions.load_on_init(True), fsOptions.save_on_del(True), fsOptions.remove_on_completion(True):
 arguments = Arguments()
-arguments.timestamp = datetime.today().strftime('%Y-%m-%d-%H:%M:%S')
+# arguments.timestamp = datetime.today().strftime('%Y-%m-%d-%H:%M:%S') # TODO bash: date +"%Y-%m-%d-%H:%M:%S"
 
 
 def update_arguments(source: Optional[Any] = None, filename: Optional[str] = None):
@@ -43,7 +43,9 @@ def update_directories(source: Optional[Any] = None, filename: Optional[str] = N
 def load_config(source: Optional[Any] = None, filename: Optional[str] = None):
     assert (source is None or filename is None) and (source is not None or filename is not None)
 
+    parse = lambda d: {k.replace(' ', '_'): parse(v) for k, v in d.items()} if isinstance(d, dict) else d
     config = NestedNamespace().get_dict(source, filename)
+    config = parse(config)
 
     if 'arguments' in config.keys():
         arguments.update(config['arguments'])

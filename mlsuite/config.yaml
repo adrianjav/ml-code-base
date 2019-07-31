@@ -7,7 +7,7 @@ directories:
   root: .
   init:
     outputs:
-      $args.timestamp:
+      #$args.timestamp:
         - plots
         - checkpoints
   create dirs: true
@@ -18,4 +18,5 @@ failsafe:
   load on init: true
   save on del: true
   remove on completion: false
-  folder: outputs/$args.timestamp/checkpoints
+  # folder: outputs/$args.timestamp/checkpoints
+  folder: outputs/checkpoints
