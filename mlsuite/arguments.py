@@ -34,6 +34,10 @@ class Arguments(metaclass=FailSafe):
         with open(filename, 'w') as file:
             yaml.safe_dump(dict(self), file)
 
+    @staticmethod
+    def setup_filename(filename):
+        return f'{filename}.yaml'
+
     def update_from_dict(self, my_dict):
         self.namespace.update_from_dict(my_dict)
 

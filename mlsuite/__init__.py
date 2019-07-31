@@ -26,10 +26,10 @@ class failsafe_folder(fsOptions.failsafe_folder): pass
 
 from .arguments import Arguments
 
-with fsOptions.inherit_on_creation(True):
-    with fsOptions.load_on_init(True), fsOptions.save_on_del(True), fsOptions.remove_on_completion(True):
-        arguments = Arguments()
-        arguments.timestamp = datetime.today().strftime('%Y-%m-%d-%H:%M:%S')
+# with fsOptions.inherit_on_creation(True):
+#     with fsOptions.load_on_init(True), fsOptions.save_on_del(True), fsOptions.remove_on_completion(True):
+arguments = Arguments()
+arguments.timestamp = datetime.today().strftime('%Y-%m-%d-%H:%M:%S')
 
 
 def update_arguments(source: Optional[Any] = None, filename: Optional[str] = None):

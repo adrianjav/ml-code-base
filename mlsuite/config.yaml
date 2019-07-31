@@ -4,7 +4,7 @@
 
 # Initial configuration for the directories
 directories:
-  root: .outputs
+  root: .
   init:
     outputs:
       $args.timestamp:

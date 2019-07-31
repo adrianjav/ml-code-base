@@ -39,9 +39,8 @@ sys.excepthook = except_hook(sys.excepthook)
 
 
 class GlobalOptions(metaclass=Options):
-    _opt_inherit_on_creation = True
-
-    _opt_load_on_init = False
+    _opt_inherit_on_creation = False
+    _opt_load_on_init = True
     _opt_save_on_del = True
     _opt_remove_on_completion = False
     _opt_failsafe_folder = dirs
@@ -91,6 +90,8 @@ class FailSafe(Options):
         def __init__(self, *args, **kwargs):
             type(self)._unique_id += 1  # For the same version of the code the id should be the same
             filename = f'{type(self).__qualname__}_{type(self)._unique_id}'
+            if hasattr(self, 'setup_filename'):
+                filename = self.setup_filename(filename)
             object.__setattr__(self, '_filename', filename)
 
             if self.load_on_init.value():
