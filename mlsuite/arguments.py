@@ -48,7 +48,8 @@ class Arguments(metaclass=FailSafe):
     def __getattr__(self, item):
         res = getattr(self.namespace, item)
         if isinstance(res, NestedNamespace):
-            return Arguments(res)
+            res = Arguments(res)
+            res.save_on_del.value(False)
         return res
 
     def __iter__(self):
@@ -57,6 +58,8 @@ class Arguments(metaclass=FailSafe):
     def __eq__(self, other):
         return self.namespace == other.namespace
 
+
+# TODO check the code hash before loading
 
 
 # Example code

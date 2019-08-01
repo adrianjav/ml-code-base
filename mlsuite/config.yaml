@@ -4,12 +4,10 @@
 
 # Initial configuration for the directories
 directories:
-  root: .
+  root: outputs
   init:
-    outputs:
-      #$args.timestamp:
-        - plots
-        - checkpoints
+      plots: None
+      checkpoints: None
   create dirs: true
 
 # Initial configuration for the failsafe system
@@ -19,4 +17,4 @@ failsafe:
   save on del: true
   remove on completion: false
   # folder: outputs/$args.timestamp/checkpoints
-  folder: outputs/checkpoints
+  folder: checkpoints
