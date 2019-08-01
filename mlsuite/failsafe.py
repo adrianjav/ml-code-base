@@ -1,13 +1,14 @@
 from pathlib import Path
 import sys
 import inspect
+import pickle
 import atexit
-from functools import partial, wraps, partialmethod
-from typing import Callable, List
+from functools import partial, wraps, partialmethod, update_wrapper
+from typing import Callable
 
 from mlsuite.utils import Options
 from mlsuite import directories as dirs
-from .directories import Directories
+from mlsuite.directories import Directories
 
 
 # Code to ensure that there is an exit code that we can check when exiting (an act wrt it)
@@ -46,11 +47,27 @@ class GlobalOptions(metaclass=Options):
     _opt_failsafe_folder = dirs
 
 
-def on_remove(self):
+# Default functions
+
+def default_remove(path):
     # print('removing', self._filename)
-    path = Path(self.path)
+    path = Path(path)
     if path.exists() and path.is_file():
         path.unlink()
+
+
+def default_save(self, path):
+    with open(path, 'wb') as file:
+        pickle.dump(self, file)
+
+
+def default_load(path):
+    path = Path(path)
+    if path.exists():
+        with path.open('rb') as file:
+            return pickle.load(file)
+    else:
+        return None
 
 
 class FailSafe(Options):
@@ -66,26 +83,28 @@ class FailSafe(Options):
 
         @staticmethod
         def _atexit_template(self) -> None:
-            if sys.exit_code == 0 and self.remove_on_completion.value():
-                self.remove()
+            if sys.exit_code == 0 and self.remove_on_completion.value() and self.save_on_del.value():
+                self.remove(self.__path__)
             else:
                 self.__del__()
             self.save_on_del.value(False)
 
         @staticmethod
         def _atexit_completion(self) -> None:
-            if sys.exit_code == 0:
-                if self.remove_on_completion.value():
-                    self.remove()
+            if sys.exit_code == 0 and self.remove_on_completion.value() and self.save_on_del.value():
+                    self.remove(self.__path__)
 
         @classmethod
-        def reset(cls):
+        def __reset_id__(cls):
             cls._unique_id = 0
 
         @property
-        def path(self):
+        def __path__(self):
             assert isinstance(self.failsafe_folder.value(), Directories), f'Expected type: {Directories.__name__}, Actual: {type(self.failsafe_folder.value())}'
-            return f'{str(self.failsafe_folder.value())}/{self._filename}'
+            return f'{str(self.failsafe_folder.value())}/{self.__filename__(self.__unique_id__)}'
+
+        def __filename__(self, id):
+            return f'{type(self).__qualname__}_{id}'
 
         def __init__(self, *args, **kwargs):
             super(FailSafe.Guardian, self).__init__(*args, **kwargs)
@@ -93,17 +112,15 @@ class FailSafe(Options):
         @staticmethod
         def init_or_load(self, __init__, *args, **kwargs):
             type(self)._unique_id += 1  # For the same version of the code the id should be the same
-            filename = f'{type(self).__qualname__}_{type(self)._unique_id}'
-            if hasattr(self, 'setup_filename'):
-                filename = self.setup_filename(filename)
-            object.__setattr__(self, '_filename', filename)
+            self_id = type(self)._unique_id
+            self.__unique_id__ = self_id
 
             if self.load_on_init.value():
                 with GlobalOptions.inherit_on_creation(True):
                     with GlobalOptions.load_on_init(False), GlobalOptions.save_on_del(False):
-                        res = self.load(self.path)
+                        res = self.load(self.__path__)
                         if res is not None:
-                            object.__setattr__(res, '_filename', f'{type(self).__name__}_{type(self)._unique_id}')
+                            if hasattr(res, '__unique_id__'): delattr(res, '__unique_id__')
                             self.__dict__.update(res.__dict__)  # TODO slots?
 
                             res._opt_save_on_del = False
@@ -115,7 +132,7 @@ class FailSafe(Options):
                 # super(FailSafe.Guardian, self).__init__(*args, **kwargs)
                 __init__(self, *args, **kwargs)
 
-            object.__setattr__(self, '_filename', filename)
+            assert self_id == self.__unique_id__
             object.__setattr__(self, '_atexit', partial(FailSafe.Guardian._atexit_template, self))
             atexit.register(self._atexit)
 
@@ -123,11 +140,10 @@ class FailSafe(Options):
             if self.save_on_del.value():
                 # print('trying to save', type(self).__name__)
                 try:
-                    self.save(self.path)
+                    self.save(self.__path__)
                 except Exception:
-                    self_id = int(self._filename.split('_')[-1])
-                    print(f'An exception happened while backing up the object {type(self).__name__} (id={self_id})')
-                    self.remove()
+                    print(f'An exception happened while saving an object {type(self).__name__}')
+                    self.remove(self.__path__)
                     raise
 
 #                atexit.unregister(self._atexit)
@@ -141,13 +157,9 @@ class FailSafe(Options):
 
         cls.__init__ = partialmethod(FailSafe.Guardian.init_or_load, cls.__init__)
 
-        if saver: setattr(cls, 'save', saver)
-        if loader: setattr(cls, 'load', staticmethod(loader))
-
-        if remover:
-            setattr(cls, 'remove', staticmethod(remover))
-        elif not hasattr(cls, 'remove'):
-            setattr(cls, 'remove', on_remove)
+        setattr(cls, 'save', saver or getattr(cls, 'save', default_save))
+        setattr(cls, 'load', staticmethod(loader or getattr(cls, 'load', default_load)))
+        setattr(cls, 'remove', staticmethod(remover or getattr(cls, 'remove', default_remove)))
 
         assert isinstance(cls.load, Callable), 'The "load" property has to be callable.'
         assert not inspect.ismethod(cls.load) or cls.load.__self__ is cls, 'the "load" method has to be of type ' \
@@ -175,6 +187,51 @@ class FailSafe(Options):
             bases = (FailSafe.Guardian,) + bases
 
         return super(FailSafe, metacls).__new__(metacls, name, bases, namespace)
+
+
+# TODO For now is only pickle
+def failsafe_result(loader=None, saver=None, remover=None):
+    def failsafe_result_(func):
+        class FailSafeWrapper(metaclass=FailSafe):
+            def __init__(self, func, *args, **kwargs):
+                self.wrapped = func(*args, **kwargs)
+
+            def __getattr__(self, item):
+                if item != 'wrapped':  # This happens if save is called when CPython is finishing
+                    return getattr(self.wrapped, item)
+                raise AttributeError(item)
+
+            def save(self, path):
+                saver(self.wrapped, path) if saver else default_save(self.wrapped, path)
+
+            @classmethod
+            def load(cls, path):
+                result = loader(path) if loader else default_load(path)
+                if result is None:
+                    return None
+
+                self = FailSafeWrapper(lambda x: x, result)
+                type(self)._unique_id -= 1
+                return self
+
+            @staticmethod
+            def remove(path):
+                print('called', path)
+                remover(path) if remover else default_remove(path)
+
+            def __filename__(self, id):
+                return f'{func.__name__}_{id}.pickle'
+
+            def __str__(self):
+                return str(self.wrapped)
+
+        @wraps(func)
+        def failsafe_result_wrapper(*args, **kwargs):
+            return FailSafeWrapper(func, *args, **kwargs)
+
+        return failsafe_result_wrapper
+    return failsafe_result_
+
 
 ################
 # Example code #
@@ -266,5 +323,19 @@ if __name__ == '__main__':
     with GlobalOptions.load_on_init(True):
         a = AnotherDummyClass(1, 2, 3)
 
+    def save(self, path):
+        print("saviiiiing")
+
+    @failsafe_result()  # (saver=save)
+    def foo(p):
+        print('ive been called')
+        return p
+
+    with GlobalOptions.inherit_on_creation(True), GlobalOptions.remove_on_completion(True):
+        my_foo = foo('hola')
+        my_foo2 = foo(2)
+
+    print("HAHAH", my_foo, my_foo2)
+    raise Exception
     #a.__del__()
     sys.exit(0)
