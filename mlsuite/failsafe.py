@@ -70,6 +70,12 @@ def default_load(path):
         return None
 
 
+def default_filename(name=None):
+    def __filename__(self, id):
+        return f'{name or type(self).__qualname__}_{id}.pickle'
+    return __filename__
+
+
 class FailSafe(Options):
     """
     Metaclass that ensures to save an object whenever the program finishes and load it at initialization in a
@@ -102,9 +108,6 @@ class FailSafe(Options):
         def __path__(self):
             assert isinstance(self.failsafe_folder.value(), Directories), f'Expected type: {Directories.__name__}, Actual: {type(self.failsafe_folder.value())}'
             return f'{str(self.failsafe_folder.value())}/{self.__filename__(self.__unique_id__)}'
-
-        def __filename__(self, id):
-            return f'{type(self).__qualname__}_{id}'
 
         def __init__(self, *args, **kwargs):
             super(FailSafe.Guardian, self).__init__(*args, **kwargs)
@@ -153,14 +156,18 @@ class FailSafe(Options):
 
             getattr(super(FailSafe.Guardian, self), '__del__', lambda: None)()
 
-    def __init__(cls, name, bases, namespace, loader=None, saver=None, remover=None):
+    def __init__(cls, name, bases, namespace, loader=None, saver=None, remover=None, filename=None):
         super(FailSafe, cls).__init__(name, bases, namespace)
 
         cls.__init__ = partialmethod(FailSafe.Guardian.init_or_load, cls.__init__)
 
+        if isinstance(filename, str):
+            filename = default_filename(filename)
+
         setattr(cls, 'save', saver or getattr(cls, 'save', default_save))
         setattr(cls, 'load', staticmethod(loader or getattr(cls, 'load', default_load)))
         setattr(cls, 'remove', staticmethod(remover or getattr(cls, 'remove', default_remove)))
+        setattr(cls, '__filename__', partialmethod(filename or getattr(cls, '__filename__', default_filename())))
 
         assert isinstance(cls.load, Callable), 'The "load" property has to be callable.'
         assert not inspect.ismethod(cls.load) or cls.load.__self__ is cls, 'the "load" method has to be of type ' \
@@ -190,10 +197,9 @@ class FailSafe(Options):
         return super(FailSafe, metacls).__new__(metacls, name, bases, namespace)
 
 
-# TODO For now is only pickle
-def failsafe_result(loader=None, saver=None, remover=None):
+def failsafe_result(loader=None, saver=None, remover=None, filename=None):
     def failsafe_result_(func):
-        class FailSafeWrapper(metaclass=FailSafe):
+        class FailSafeWrapper(metaclass=FailSafe, filename=filename):
             def __init__(self, func, *args, **kwargs):
                 self.wrapped = func(*args, **kwargs)
 
