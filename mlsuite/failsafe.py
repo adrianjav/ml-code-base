@@ -1,14 +1,25 @@
 from pathlib import Path
 import sys
 import inspect
-import pickle
+import dill
 import atexit
-from functools import partial, wraps, partialmethod, update_wrapper
+from functools import partial, wraps, partialmethod
 from typing import Callable
 
 from mlsuite.utils import Options
 from mlsuite import directories as dirs
 from mlsuite.directories import Directories
+
+
+def keyboard_stopable(func):
+    @wraps(func)
+    def keyboard_stopable_(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except KeyboardInterrupt:
+            print(f'{func.__name__} interrupted by keyboard.', file=sys.stderr)
+            pass
+    return keyboard_stopable_
 
 
 # Code to ensure that there is an exit code that we can check when exiting (an act wrt it)
@@ -58,14 +69,14 @@ def default_remove(path):
 
 def default_save(self, path):
     with open(path, 'wb') as file:
-        pickle.dump(self, file)
+        dill.dump(self, file)
 
 
 def default_load(path):
     path = Path(path)
     if path.exists():
         with path.open('rb') as file:
-            return pickle.load(file)
+            return dill.load(file)
     else:
         return None
 
@@ -89,11 +100,14 @@ class FailSafe(Options):
 
         @staticmethod
         def _atexit_template(self) -> None:
-            if sys.exit_code == 0 and self.remove_on_completion.value() and self.save_on_del.value():
+            isremove = sys.exit_code == 0 and self.remove_on_completion.value() and self.save_on_del.value()
+
+            if isremove:
                 self.remove(self.__path__)
-            else:
-                self.__del__()
-            self.save_on_del.value(False)
+                self.save_on_del.value(False)
+
+            self.__del__()
+
 
         @staticmethod
         def _atexit_completion(self) -> None:
@@ -141,12 +155,12 @@ class FailSafe(Options):
             object.__setattr__(self, '_atexit', partial(FailSafe.Guardian._atexit_template, self))
             atexit.register(self._atexit)
 
-        def __del__(self):
+        def delete(self, __del__):
             if self.save_on_del.value():
                 try:
                     self.save(self.__path__)
                 except Exception:
-                    print(f'An exception happened while saving an object {type(self).__name__}')
+                    print(f'An exception happened while saving {self.__path__}')
                     self.remove(self.__path__)
                     raise
 
@@ -154,12 +168,13 @@ class FailSafe(Options):
                 atexit.register(partial(FailSafe.Guardian._atexit_completion, self))
                 self.save_on_del.value(False)
 
-            getattr(super(FailSafe.Guardian, self), '__del__', lambda: None)()
+            if __del__: __del__(self)
 
     def __init__(cls, name, bases, namespace, loader=None, saver=None, remover=None, filename=None):
         super(FailSafe, cls).__init__(name, bases, namespace)
 
         cls.__init__ = partialmethod(FailSafe.Guardian.init_or_load, cls.__init__)
+        cls.__del__ = partialmethod(FailSafe.Guardian.delete, getattr(cls, '__del__', None))
 
         if isinstance(filename, str):
             filename = default_filename(filename)
@@ -201,7 +216,11 @@ def failsafe_result(loader=None, saver=None, remover=None, filename=None):
     def failsafe_result_(func):
         class FailSafeWrapper(metaclass=FailSafe, filename=filename):
             def __init__(self, func, *args, **kwargs):
-                self.wrapped = func(*args, **kwargs)
+                try:
+                    self.wrapped = func(*args, **kwargs)
+                except Exception:
+                    # self.save_on_del.value(False)
+                    self.wrapped = None  # It writes the file but doesn't load it anyway because it is None
 
             def __getattr__(self, item):
                 if item != 'wrapped':  # This happens if save is called when CPython is finishing
@@ -223,7 +242,6 @@ def failsafe_result(loader=None, saver=None, remover=None, filename=None):
 
             @staticmethod
             def remove(path):
-                print('called', path)
                 remover(path) if remover else default_remove(path)
 
             def __filename__(self, id):
@@ -239,6 +257,16 @@ def failsafe_result(loader=None, saver=None, remover=None, filename=None):
         return failsafe_result_wrapper
     return failsafe_result_
 
+
+def execute_once(func):
+    @failsafe_result()
+    @wraps(func)
+    def execute_once_(*args, **kwargs):
+        result = func(*args, **kwargs)
+        return result if result is not None else 1
+    return execute_once_
+
+# TODO check *args, **kwargs on calls to load or not (safe hash of the parameters)
 
 ################
 # Example code #

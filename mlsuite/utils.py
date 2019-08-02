@@ -45,6 +45,14 @@ def with_stmt(outer_func):
     return CM
 
 
+def getstate(self):
+    state = self.__dict__
+    for attr in [v for v in dir(self) if v.startswith('_opt_')]:
+        if attr[len('_opt_'):] in state.keys():
+            state.pop(attr[len('_opt_'):])
+    return state
+
+
 class Options(type):
     def __init__(cls, name, bases, namespace):
         super(Options, cls).__init__(name, bases, namespace)
@@ -56,6 +64,9 @@ class Options(type):
 
         for attr in [x for x in namespace if x.startswith('_opt_')]:
             setattr(cls, attr[len('_opt_'):], with_stmt(partial(getter, cls, attr)))
+
+        # To avoid trying to pickle CM
+        setattr(cls, '__getstate__', getattr(cls, '__getstate__', getstate))
 
     def decorate(cls, instance):
 

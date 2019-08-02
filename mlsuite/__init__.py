@@ -13,7 +13,7 @@ directories = Directories()
 class create_dirs(dirsOptions.create_dirs): pass
 
 
-from .failsafe import FailSafe, failsafe_result, GlobalOptions as fsOptions
+from .failsafe import FailSafe, failsafe_result, keyboard_stopable, execute_once, GlobalOptions as fsOptions
 
 
 # FailSafe options
@@ -78,5 +78,5 @@ load_config(filename=f'{os.path.dirname(os.path.abspath(__file__))}/config.yaml'
 
 
 __all__ = ['arguments', 'directories', 'FailSafe', 'update_arguments', 'update_directories', 'inherit_on_creation',
-           'failsafe_result']
+           'failsafe_result', 'keyboard_stopable', 'execute_once']
 
