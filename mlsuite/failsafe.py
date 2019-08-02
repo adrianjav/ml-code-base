@@ -222,6 +222,9 @@ def failsafe_result(loader=None, saver=None, remover=None, filename=None):
                     # self.save_on_del.value(False)
                     self.wrapped = None  # It writes the file but doesn't load it anyway because it is None
 
+            def __len__(self):
+                return len(self.wrapped)
+
             def __getattr__(self, item):
                 if item != 'wrapped':  # This happens if save is called when CPython is finishing
                     return getattr(self.wrapped, item)
