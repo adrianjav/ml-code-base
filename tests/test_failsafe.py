@@ -53,8 +53,8 @@ class TestBodyguard(unittest.TestCase):
         mlsuite.failsafe_folder.value(dirs.dummy_saves)
         GlobalOptions.load_on_init.value(False)
 
-        DummyClass.reset()
-        AnotherDummyClass.reset()
+        DummyClass.__reset_id__()
+        AnotherDummyClass.__reset_id__()
 
     def test_init_global(self):
         obj = DummyClass(2, 3, 4)

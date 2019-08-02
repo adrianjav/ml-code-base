@@ -116,20 +116,22 @@ class FailSafe(Options):
             self.__unique_id__ = self_id
 
             if self.load_on_init.value():
-                with GlobalOptions.inherit_on_creation(True):
-                    with GlobalOptions.load_on_init(False), GlobalOptions.save_on_del(False):
-                        res = self.load(self.__path__)
-                        if res is not None:
-                            if hasattr(res, '__unique_id__'): delattr(res, '__unique_id__')
-                            self.__dict__.update(res.__dict__)  # TODO slots?
+                with GlobalOptions.load_on_init(False), GlobalOptions.save_on_del(False):
+                    res = self.load(self.__path__)
+                    if res is not None:
+                        type(res).decorate(res)  # depending on the load function this might not be called
 
-                            res._opt_save_on_del = False
-                            res.__del__()
-                        else:
-                            # super(FailSafe.Guardian, self).__init__(*args, **kwargs)
-                            __init__(self, *args, **kwargs)
+                        # As Failsafe.__call__ might not get called I have to force it to inherit the options
+                        for attr in [v for v in dir(res) if v.startswith('_opt_')]:
+                            setattr(res, attr, getattr(res, attr[len('_opt_'):]).value())
+
+                        if hasattr(res, '__unique_id__'): delattr(res, '__unique_id__')
+                        self.__dict__.update(res.__dict__)  # TODO slots?
+                        res.__del__()
+
+                    else:
+                        __init__(self, *args, **kwargs)
             else:
-                # super(FailSafe.Guardian, self).__init__(*args, **kwargs)
                 __init__(self, *args, **kwargs)
 
             assert self_id == self.__unique_id__
@@ -138,7 +140,6 @@ class FailSafe(Options):
 
         def __del__(self):
             if self.save_on_del.value():
-                # print('trying to save', type(self).__name__)
                 try:
                     self.save(self.__path__)
                 except Exception:
