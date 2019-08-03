@@ -46,10 +46,14 @@ class Arguments(metaclass=FailSafe):
         return self
 
     def __getattr__(self, item):
+        if item == 'namespace':
+            raise AttributeError(item)
+
         res = getattr(self.namespace, item)
         if isinstance(res, NestedNamespace):
-            res = Arguments(res)
-            res.save_on_del.value(False)
+            with Arguments.load_on_init(False):
+                res = Arguments(res)
+                res.save_on_del.value(False)
         return res
 
     def __iter__(self):

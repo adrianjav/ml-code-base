@@ -6,9 +6,9 @@ import atexit
 from functools import partial, wraps, partialmethod
 from typing import Callable
 
-from mlsuite.utils import Options
+from .options import Options
+from .directories import Directories
 from mlsuite import directories as dirs
-from mlsuite.directories import Directories
 
 
 def keyboard_stopable(func):
@@ -222,8 +222,15 @@ def failsafe_result(loader=None, saver=None, remover=None, filename=None):
                     # self.save_on_del.value(False)
                     self.wrapped = None  # It writes the file but doesn't load it anyway because it is None
 
-            def __len__(self):
-                return len(self.wrapped)
+            def __len__(self): return len(self.wrapped)
+            def __iter__(self): return self.wrapped.__iter__()
+            def __getitem__(self, item): return self.wrapped.__getitem__(item)
+
+            def __getstate__(self):
+                return getattr(self.wrapped, '__getstate__', lambda: self.wrapped.__dict__)()
+
+            def __setstate__(self, state):
+                getattr(self.wrapped, '__setstate__', lambda s: self.wrapped.__dict__.update(s))(state)
 
             def __getattr__(self, item):
                 if item != 'wrapped':  # This happens if save is called when CPython is finishing

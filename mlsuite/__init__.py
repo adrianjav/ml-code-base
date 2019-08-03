@@ -2,9 +2,8 @@ import os
 from datetime import datetime
 from typing import Optional, Any
 
-from .utils import args_to_str
 from .data_structures import NestedNamespace
-from .directories import Directories, GlobalOptions as dirsOptions
+from .directories import args_to_str, Directories, GlobalOptions as dirsOptions
 
 directories = Directories()
 

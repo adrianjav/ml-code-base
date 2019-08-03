@@ -5,23 +5,22 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from mlsuite.data_structures import NestedNamespace
-from mlsuite.utils import Options, args_to_str
-
-# From this class we are also going to have a single global variable directories which
-# we will take root directory like
-# from * import directories as dirs
-# dirs.root
-# and subfolders like dirs.subfolder.root
-# and leaf subfolders like dirs.subfolder1.subfolder2
-#
-# This class is going to be instantiated from the very beginning but it shouldn't create
-# any directory until someone is accessing to it
-#
-# We update it as dirs.update({'folder1': ['subfolder1', 'subfolder2']}) (add { root': '.'} in the function)
-# then, lazily create the folder as we access to them
+from mlsuite.options import Options
 
 
-# metaclass tiene que coger los atributos,
+def args_to_str(sentence):
+    if not sentence.startswith('$args'):
+        return sentence
+
+    from . import arguments as args
+    from .data_structures import NestedNamespace
+
+    new_sentence = args
+    for s in sentence.split('.')[1:]:
+        new_sentence = getattr(new_sentence, s)
+    assert not isinstance(new_sentence, NestedNamespace)
+    return new_sentence
+
 
 class GlobalOptions(metaclass=Options):
     _opt_create_dirs = True
@@ -113,6 +112,9 @@ class Directories(GlobalOptions):  # I can inherit from it since I don't plan to
         self._root = str(self.root)
 
     def __getattr__(self, item):
+        if item == 'namespace':
+            raise AttributeError(item)
+
         res = getattr(self.namespace, item)
 
         if isinstance(res, NestedNamespace):
