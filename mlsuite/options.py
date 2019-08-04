@@ -39,6 +39,27 @@ def getstate(self):
     return state
 
 
+def safe_getstate(getstate):
+    def safe_getstate_(self):
+        import inspect  # TODO temporary
+
+        new_state = {'state': getstate(self)}
+        new_state.update({k: v for k, v in inspect.getmembers(self) if k.startswith('_opt_')})
+
+        return new_state
+    return safe_getstate_
+
+
+def safe_setstate(setstate):
+    def safe_setstate_(self, state):
+        for k, v in state.items():
+            if k.startswith('_opt_'):
+                setattr(self, k, v)
+
+        setstate(self, state['state'])
+    return safe_setstate_
+
+
 class Options(type):
     def __init__(cls, name, bases, namespace):
         super(Options, cls).__init__(name, bases, namespace)
@@ -51,8 +72,8 @@ class Options(type):
         for attr in [x for x in namespace if x.startswith('_opt_')]:
             setattr(cls, attr[len('_opt_'):], with_stmt(partial(getter, cls, attr)))
 
-        # To avoid trying to pickle CM
-        setattr(cls, '__getstate__', getattr(cls, '__getstate__', getstate))
+        setattr(cls, '__getstate__', safe_getstate(getattr(cls, '__getstate__', getstate)))  # can't pickle CM
+        setattr(cls, '__setstate__', safe_setstate(getattr(cls, '__setstate__', lambda s, d: s.__dict__.update(d))))
 
     def decorate(cls, instance):
 

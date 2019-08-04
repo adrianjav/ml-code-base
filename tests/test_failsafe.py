@@ -42,6 +42,9 @@ class AnotherDummyClass(DummyClass):  # It inherits the metaclass flavour
     @classmethod
     def load(cls, filename):  # Overriding is possible
         instance = super(AnotherDummyClass, cls).load(filename)
+        if instance is None:
+            return None
+
         instance.a = filename
         return instance
 

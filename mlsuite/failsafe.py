@@ -11,17 +11,6 @@ from .directories import Directories
 from mlsuite import directories as dirs
 
 
-def keyboard_stopable(func):
-    @wraps(func)
-    def keyboard_stopable_(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except KeyboardInterrupt:
-            print(f'{func.__name__} interrupted by keyboard.', file=sys.stderr)
-            pass
-    return keyboard_stopable_
-
-
 # Code to ensure that there is an exit code that we can check when exiting (an act wrt it)
 
 def exit_hook(func):
@@ -32,16 +21,17 @@ def exit_hook(func):
     return _exit_hook
 
 
-def except_hook(func):
+def except_hook(func):  # TODO it breaks when debugging with PyCharm
     @wraps(func)
-    def _except_hook(*args, **kwargs):
+    def except_hook_(*args, **kwargs):
         sys.exit_code = None
         func(*args, **kwargs)
-    return _except_hook
+    return except_hook_
 
 
 def exit_assert():
-    assert hasattr(sys, 'exit_code'), 'Make sure to call "sys.exit" in your program.'  # TODO exit function
+    assert hasattr(sys, 'exit_code'), 'Make sure to call "sys.exit" in your program.'  # TODO exit function?
+
 
 atexit.register(exit_assert)
 sys.exit = exit_hook(sys.exit)
@@ -61,7 +51,6 @@ class GlobalOptions(metaclass=Options):
 # Default functions
 
 def default_remove(path):
-    # print('removing', self._filename)
     path = Path(path)
     if path.exists() and path.is_file():
         path.unlink()
@@ -87,6 +76,31 @@ def default_filename(name=None):
     return __filename__
 
 
+def default_getstate(self):
+    return self.__dict__
+
+
+def default_setstate(self, state):
+    self.__dict__.udpdate(state)
+
+
+def failsafe_getstate(getstate):
+    @wraps(getstate)
+    def failsafe_getstate_(self):
+        state = getstate(self)
+        state.update({'_oid': self._oid})
+        return state
+    return failsafe_getstate_
+
+
+def failsafe_setstate(setstate):
+    @wraps(setstate)
+    def failsafe_setstate_(self, state):
+        self._oid = state.pop('_oid')
+        setstate(self, state)
+    return failsafe_setstate_
+
+
 class FailSafe(Options):
     """
     Metaclass that ensures to save an object whenever the program finishes and load it at initialization in a
@@ -100,19 +114,17 @@ class FailSafe(Options):
 
         @staticmethod
         def _atexit_template(self) -> None:
-            isremove = sys.exit_code == 0 and self.remove_on_completion.value() and self.save_on_del.value()
-
-            if isremove:
+            if sys.exit_code == 0 and self.remove_on_completion.value() and self.save_on_del.value():
                 self.remove(self.__path__)
                 self.save_on_del.value(False)
 
-            self.__del__()
-
-
-        @staticmethod
-        def _atexit_completion(self) -> None:
-            if sys.exit_code == 0 and self.remove_on_completion.value() and self.save_on_del.value():
+            if self.save_on_del.value():
+                try:
+                    self.save(self.__path__)
+                except Exception as e:
+                    print(f'{id(self)} An exception happened while saving {self.__path__}: {e}', file=sys.stderr)
                     self.remove(self.__path__)
+                    raise
 
         @classmethod
         def __reset_id__(cls):
@@ -121,7 +133,7 @@ class FailSafe(Options):
         @property
         def __path__(self):
             assert isinstance(self.failsafe_folder.value(), Directories), f'Expected type: {Directories.__name__}, Actual: {type(self.failsafe_folder.value())}'
-            return f'{str(self.failsafe_folder.value())}/{self.__filename__(self.__unique_id__)}'
+            return f'{str(self.failsafe_folder.value())}/{self.__filename__(self._oid)}'
 
         def __init__(self, *args, **kwargs):
             super(FailSafe.Guardian, self).__init__(*args, **kwargs)
@@ -129,60 +141,45 @@ class FailSafe(Options):
         @staticmethod
         def init_or_load(self, __init__, *args, **kwargs):
             type(self)._unique_id += 1  # For the same version of the code the id should be the same
-            self_id = type(self)._unique_id
-            self.__unique_id__ = self_id
+            self._oid = type(self)._unique_id
 
             if self.load_on_init.value():
                 with GlobalOptions.load_on_init(False), GlobalOptions.save_on_del(False):
                     res = self.load(self.__path__)
-                    if res is not None:
-                        type(res).decorate(res)  # depending on the load function this might not be called
 
-                        # As Failsafe.__call__ might not get called I have to force it to inherit the options
-                        for attr in [v for v in dir(res) if v.startswith('_opt_')]:
-                            setattr(res, attr, getattr(res, attr[len('_opt_'):]).value())
+                if res is not None:
+                    type(res).decorate(res)  # depending on the load function this might not be called
 
-                        if hasattr(res, '__unique_id__'): delattr(res, '__unique_id__')
-                        self.__dict__.update(res.__dict__)  # TODO slots?
-                        res.__del__()
+                    # As Failsafe.__call__ might not get called I have to force it to inherit the options
+                    for attr in [v for v in dir(res) if v.startswith('_opt_')]:
+                        setattr(res, attr, getattr(res, attr[len('_opt_'):]).value())
 
-                    else:
-                        __init__(self, *args, **kwargs)
+                    self.__dict__.update(res.__dict__)  # TODO slots?
+                    object.__setattr__(res, '_atexit', partial(FailSafe.Guardian._atexit_template, res))
+
+                else:
+                    __init__(self, *args, **kwargs)
             else:
                 __init__(self, *args, **kwargs)
 
-            assert self_id == self.__unique_id__
+            # assert self_id == self._obj_id, f'{self_id}, {self._obj_id}, {type(self)}'
             object.__setattr__(self, '_atexit', partial(FailSafe.Guardian._atexit_template, self))
             atexit.register(self._atexit)
-
-        def delete(self, __del__):
-            if self.save_on_del.value():
-                try:
-                    self.save(self.__path__)
-                except Exception:
-                    print(f'An exception happened while saving {self.__path__}')
-                    self.remove(self.__path__)
-                    raise
-
-#                atexit.unregister(self._atexit)
-                atexit.register(partial(FailSafe.Guardian._atexit_completion, self))
-                self.save_on_del.value(False)
-
-            if __del__: __del__(self)
 
     def __init__(cls, name, bases, namespace, loader=None, saver=None, remover=None, filename=None):
         super(FailSafe, cls).__init__(name, bases, namespace)
 
         cls.__init__ = partialmethod(FailSafe.Guardian.init_or_load, cls.__init__)
-        cls.__del__ = partialmethod(FailSafe.Guardian.delete, getattr(cls, '__del__', None))
 
-        if isinstance(filename, str):
-            filename = default_filename(filename)
+        if isinstance(filename, str): filename = default_filename(filename)
 
         setattr(cls, 'save', saver or getattr(cls, 'save', default_save))
         setattr(cls, 'load', staticmethod(loader or getattr(cls, 'load', default_load)))
         setattr(cls, 'remove', staticmethod(remover or getattr(cls, 'remove', default_remove)))
         setattr(cls, '__filename__', partialmethod(filename or getattr(cls, '__filename__', default_filename())))
+
+        setattr(cls, '__getstate__', failsafe_getstate(getattr(cls, '__getstate__', default_getstate)))
+        setattr(cls, '__setstate__', failsafe_setstate(getattr(cls, '__setstate__', default_setstate)))
 
         assert isinstance(cls.load, Callable), 'The "load" property has to be callable.'
         assert not inspect.ismethod(cls.load) or cls.load.__self__ is cls, 'the "load" method has to be of type ' \
@@ -212,64 +209,46 @@ class FailSafe(Options):
         return super(FailSafe, metacls).__new__(metacls, name, bases, namespace)
 
 
-def failsafe_result(loader=None, saver=None, remover=None, filename=None):
-    def failsafe_result_(func):
-        class FailSafeWrapper(metaclass=FailSafe, filename=filename):
-            def __init__(self, func, *args, **kwargs):
-                try:
-                    self.wrapped = func(*args, **kwargs)
-                except Exception:
-                    # self.save_on_del.value(False)
-                    self.wrapped = None  # It writes the file but doesn't load it anyway because it is None
+# TODO for now this has the basic options (non-configurable at all)
+class FailSafeWrapper(metaclass=FailSafe):
+    def __init__(self, func, *args, **kwargs):
+        try:
+            self.wrapped = func(*args, **kwargs)
+        except Exception:
+            pass
 
-            def __len__(self): return len(self.wrapped)
-            def __iter__(self): return self.wrapped.__iter__()
-            def __getitem__(self, item): return self.wrapped.__getitem__(item)
+    def __len__(self): return len(self.wrapped)
+    def __iter__(self): return self.wrapped.__iter__()
+    def __getitem__(self, item): return self.wrapped.__getitem__(item)
 
-            def __getstate__(self):
-                return getattr(self.wrapped, '__getstate__', lambda: self.wrapped.__dict__)()
+    @staticmethod
+    def loadasas(path):
+        result = default_load(path)
+        if result.wrapper is None:
+            return None
+        return result
 
-            def __setstate__(self, state):
-                getattr(self.wrapped, '__setstate__', lambda s: self.wrapped.__dict__.update(s))(state)
+    def __getattr__(self, item):
+        if item != 'wrapped':  # This happens if save is called when CPython is already shutting down
+            return getattr(self.wrapped, item)
+        raise AttributeError(item)
 
-            def __getattr__(self, item):
-                if item != 'wrapped':  # This happens if save is called when CPython is finishing
-                    return getattr(self.wrapped, item)
-                raise AttributeError(item)
+    def __str__(self):
+        return str(self.wrapped)
 
-            def save(self, path):
-                saver(self.wrapped, path) if saver else default_save(self.wrapped, path)
 
-            @classmethod
-            def load(cls, path):
-                result = loader(path) if loader else default_load(path)
-                if result is None:
-                    return None
+def failsafe_result(func):
+    @wraps(func)
+    def failsafe_result_wrapper(*args, **kwargs):
+        wrapper = FailSafeWrapper(func, *args, **kwargs)
+        # wrapper.__filename__ = lambda oid: f'{func.__name__}_{oid}.pickle'
+        return wrapper
 
-                self = FailSafeWrapper(lambda x: x, result)
-                type(self)._unique_id -= 1
-                return self
-
-            @staticmethod
-            def remove(path):
-                remover(path) if remover else default_remove(path)
-
-            def __filename__(self, id):
-                return f'{func.__name__}_{id}.pickle'
-
-            def __str__(self):
-                return str(self.wrapped)
-
-        @wraps(func)
-        def failsafe_result_wrapper(*args, **kwargs):
-            return FailSafeWrapper(func, *args, **kwargs)
-
-        return failsafe_result_wrapper
-    return failsafe_result_
+    return failsafe_result_wrapper
 
 
 def execute_once(func):
-    @failsafe_result()
+    @failsafe_result
     @wraps(func)
     def execute_once_(*args, **kwargs):
         result = func(*args, **kwargs)
@@ -371,7 +350,7 @@ if __name__ == '__main__':
     def save(self, path):
         print("saviiiiing")
 
-    @failsafe_result()  # (saver=save)
+    @failsafe_result  # (saver=save)
     def foo(p):
         print('ive been called')
         return p

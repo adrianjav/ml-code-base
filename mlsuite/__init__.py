@@ -1,6 +1,6 @@
 import os
-from datetime import datetime
 from typing import Optional, Any
+from datetime import datetime
 
 from .data_structures import NestedNamespace
 from .directories import args_to_str, Directories, GlobalOptions as dirsOptions
@@ -12,7 +12,7 @@ directories = Directories()
 class create_dirs(dirsOptions.create_dirs): pass
 
 
-from .failsafe import FailSafe, failsafe_result, keyboard_stopable, execute_once, GlobalOptions as fsOptions
+from .failsafe import FailSafe, failsafe_result, execute_once, GlobalOptions as fsOptions
 
 
 # FailSafe options
@@ -22,6 +22,8 @@ class remove_on_completion(fsOptions.remove_on_completion): pass
 class inherit_on_creation(fsOptions.inherit_on_creation): pass
 class failsafe_folder(fsOptions.failsafe_folder): pass
 
+
+inherit = inherit_on_creation(True)
 
 from .arguments import Arguments
 
