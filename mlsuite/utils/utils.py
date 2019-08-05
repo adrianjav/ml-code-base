@@ -11,6 +11,8 @@ def timed(func):
         end = time.time()
 
         print(f'{func.__name__} completed in {end - start :.3f} seconds.')
+        print()
+
         return result
     return timed_
 

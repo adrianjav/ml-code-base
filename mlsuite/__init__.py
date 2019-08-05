@@ -1,6 +1,5 @@
 import os
 from typing import Optional, Any
-from datetime import datetime
 
 from .data_structures import NestedNamespace
 from .directories import args_to_str, Directories, GlobalOptions as dirsOptions
@@ -12,7 +11,7 @@ directories = Directories()
 class create_dirs(dirsOptions.create_dirs): pass
 
 
-from .failsafe import FailSafe, failsafe_result, execute_once, GlobalOptions as fsOptions
+from mlsuite.filesafe import FailSafe, failsafe_result, execute_once, GlobalOptions as fsOptions
 
 
 # FailSafe options
