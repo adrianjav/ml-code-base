@@ -11,7 +11,7 @@ directories = Directories()
 class create_dirs(dirsOptions.create_dirs): pass
 
 
-from mlsuite.filesafe import FailSafe, failsafe_result, execute_once, GlobalOptions as fsOptions
+from mlsuite.filesafe import FailSafe, failsafe_result, execute_once, failsafe_object, GlobalOptions as fsOptions
 
 
 # FailSafe options
@@ -78,5 +78,5 @@ load_config(filename=f'{os.path.dirname(os.path.abspath(__file__))}/config.yaml'
 
 
 __all__ = ['arguments', 'directories', 'FailSafe', 'update_arguments', 'update_directories', 'inherit_on_creation',
-           'failsafe_result', 'keyboard_stopable', 'execute_once']
+           'failsafe_result', 'execute_once', 'failsafe_object']
 

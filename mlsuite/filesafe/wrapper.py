@@ -49,3 +49,7 @@ def execute_once(func):
         result = func(*args, **kwargs)
         return result if result is not None else 1
     return execute_once_
+
+@failsafe_result
+def failsafe_object(obj):
+    return obj
