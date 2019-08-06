@@ -8,6 +8,7 @@ class FailSafeWrapper(metaclass=FailSafe):
     def __init__(self, func, *args, **kwargs):
         try:
             self.wrapped = func(*args, **kwargs)
+            self.func_name = func.__name__
         except Exception:
             self.wrapped = None
             raise
@@ -23,6 +24,9 @@ class FailSafeWrapper(metaclass=FailSafe):
             return None
         return result
 
+    def __filename__(self, oid):
+        return f'{self.func_name}_{oid}.pickle'
+
     def __getattr__(self, item):
         if item != 'wrapped':  # This happens if save is called when CPython is already shutting down
             return getattr(self.wrapped, item)
@@ -36,7 +40,6 @@ def failsafe_result(func):
     @wraps(func)
     def failsafe_result_wrapper(*args, **kwargs):
         wrapper = FailSafeWrapper(func, *args, **kwargs)
-        # wrapper.__filename__ = lambda oid: f'{func.__name__}_{oid}.pickle'
         return wrapper
 
     return failsafe_result_wrapper
@@ -50,6 +53,10 @@ def execute_once(func):
         return result if result is not None else 1
     return execute_once_
 
-@failsafe_result
+
 def failsafe_object(obj):
-    return obj
+    def failsafe_object_(obj):
+        return obj
+
+    failsafe_object_.__name__ = type(obj).__name__  # Save it with the name of the object safed
+    return failsafe_result(failsafe_object_)(obj)

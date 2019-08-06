@@ -120,7 +120,15 @@ class FailSafe(Options):
 
             if self.load_on_init.value():
                 with GlobalOptions.load_on_init(False), GlobalOptions.save_on_del(False):
-                    res = self.load(self.__path__)
+                    from .wrapper import FailSafeWrapper
+                    if isinstance(self, FailSafeWrapper):
+                        if 'func' in kwargs:
+                            path = f'{str(self.failsafe_folder.value())}/{kwargs["func"].__name__}_{self._oid}.pickle'
+                        else:
+                            path = f'{str(self.failsafe_folder.value())}/{args[0].__name__}_{self._oid}.pickle'
+                    else:
+                        path = self.__path__
+                    res = self.load(path)
 
                 if res is not None:
                     type(res).decorate(res)  # depending on the load function this might not be called
