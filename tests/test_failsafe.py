@@ -1,6 +1,6 @@
 import unittest
 import mlsuite
-from mlsuite.filesafe.failsafe import FailSafe, GlobalOptions
+from mlsuite.failsafe.failsafe import FailSafe, GlobalOptions
 from mlsuite import directories as dirs
 
 mlsuite.save_on_del.value(False)

@@ -107,7 +107,7 @@ class FailSafe(Options):
 
         @property
         def __path__(self):
-            assert isinstance(self.failsafe_folder.value(), Directories), f'Expected type: {Directories.__name__}, Actual: {type(self.failsafe_folder.value())}'
+#            assert isinstance(self.failsafe_folder.value(), Directories), f'Expected type: {Directories.__name__}, Actual: {type(self.failsafe_folder.value())}'
             return f'{str(self.failsafe_folder.value())}/{self.__filename__(self._oid)}'
 
         def __init__(self, *args, **kwargs):

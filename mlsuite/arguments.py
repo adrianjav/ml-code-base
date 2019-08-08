@@ -5,7 +5,7 @@ from pathlib import Path
 import yaml
 
 from mlsuite.data_structures import NestedNamespace
-from mlsuite.filesafe.failsafe import FailSafe
+from mlsuite.failsafe.failsafe import FailSafe
 
 
 class Arguments(metaclass=FailSafe):

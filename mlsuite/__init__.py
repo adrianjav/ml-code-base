@@ -11,7 +11,7 @@ directories = Directories()
 class create_dirs(dirsOptions.create_dirs): pass
 
 
-from mlsuite.filesafe import FailSafe, failsafe_result, execute_once, failsafe_object, GlobalOptions as fsOptions
+from mlsuite.failsafe import FailSafe, failsafe_result, execute_once, failsafe_object, GlobalOptions as fsOptions
 
 
 # FailSafe options
