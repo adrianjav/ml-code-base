@@ -9,17 +9,18 @@ from mlsuite.options import Options
 
 
 def args_to_str(sentence):
-    if not sentence.startswith('$args'):
+    pos = sentence.find('$args')
+    if pos == -1:
         return sentence
 
     from . import arguments as args
     from .data_structures import NestedNamespace
 
     new_sentence = args
-    for s in sentence.split('.')[1:]:
+    for s in sentence[pos:].split('.')[1:]:
         new_sentence = getattr(new_sentence, s)
     assert not isinstance(new_sentence, NestedNamespace)
-    return new_sentence
+    return sentence[:pos] + new_sentence
 
 
 class GlobalOptions(metaclass=Options):
@@ -91,8 +92,10 @@ class Directories(GlobalOptions):  # I can inherit from it since I don't plan to
         new_res = {}
         for k, v in res.items():
             k = args_to_str(k)
+            if isinstance(v, str):
+                v = args_to_str(v)
 
-            if isinstance(v, dict) or isinstance(v, Iterable):
+            if not isinstance(v, str) and (isinstance(v, dict) or isinstance(v, Iterable)):
                 new_res[k] = self._process_dirs(v, root=f'{root}/{k}')
             else:
                 new_res[k] = LazyDirectory(k)
@@ -106,7 +109,7 @@ class Directories(GlobalOptions):  # I can inherit from it since I don't plan to
                     source is None and filename is None), 'Set one of "source" and "filename"'
 
         raw_dict = self.namespace.get_dict(source, filename)
-        root = raw_dict['root'] if 'root' in raw_dict.keys() else self._root
+        root = args_to_str(raw_dict['root']) if 'root' in raw_dict.keys() else self._root
         raw_dict = self._process_dirs(raw_dict, root)
         self.namespace.update(raw_dict)
         self._root = str(self.root)

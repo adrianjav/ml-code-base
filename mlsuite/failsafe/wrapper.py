@@ -32,6 +32,9 @@ class FailSafeWrapper(metaclass=FailSafe):
             return getattr(self.wrapped, item)
         raise AttributeError(item)
 
+    def __call__(self, *args, **kwargs):
+        return self.wrapped(*args, **kwargs)
+
     def __str__(self):
         return str(self.wrapped)
 
