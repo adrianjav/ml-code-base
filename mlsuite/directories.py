@@ -8,19 +8,47 @@ from mlsuite.data_structures import NestedNamespace
 from mlsuite.options import Options
 
 
-def args_to_str(sentence):
-    pos = sentence.find('$args')
-    if pos == -1:
-        return sentence
 
-    from . import arguments as args
-    from .data_structures import NestedNamespace
+def args_to_str(string):
+    def args_to_str__(path):
+        from . import arguments as args
+        from .data_structures import NestedNamespace
 
-    new_sentence = args
-    for s in sentence[pos:].split('.')[1:]:
-        new_sentence = getattr(new_sentence, s)
-    assert not isinstance(new_sentence, NestedNamespace)
-    return sentence[:pos] + new_sentence
+        res = args
+        for attr in path.split('.')[1:]:
+            res = getattr(res, attr)
+        assert not isinstance(res, NestedNamespace)
+
+        return str(res)
+
+    def args_to_str_(path):
+        result, pos = [], 0
+        while pos < len(path):
+            next_pos, end_pos = path.find('($args', pos), -1
+            if next_pos == -1:
+                next_pos = path.find('$args', pos)
+            else:
+                end_pos = path.find(')', next_pos)
+
+            if next_pos == -1:
+                next_pos = len(path)
+            if end_pos == -1:
+                end_pos = len(path)
+
+            if pos != next_pos:
+                result += [path[pos:next_pos]]
+
+            if next_pos != len(path):
+                result += [args_to_str__(path[next_pos: end_pos])]
+
+            pos = end_pos + 1
+
+        return ''.join(result)
+
+    result = []
+    for path in string.split('/'):
+        result += [args_to_str_(path)]
+    return '/'.join(result)
 
 
 class GlobalOptions(metaclass=Options):
