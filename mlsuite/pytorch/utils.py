@@ -1,5 +1,13 @@
+import atexit
+
+import torch
 import torch.backends.cudnn
 import torch.cuda
+
+if int(torch.__version__.split('.')[0]) >= 1 and int(torch.__version__.split('.')[1]) >= 2:
+    from torch.utils.tensorboard import SummaryWriter
+else:
+    from tensorboardX import SummaryWriter
 
 
 def fix_seed(seed) -> None:
@@ -25,3 +33,32 @@ def to_one_hot(x, size):
     x_one_hot.scatter_(1, x.unsqueeze(-1).long(), 1).float()
 
     return x_one_hot
+
+
+class LazySummaryWritter(object):
+    def __init__(self, log_dir):
+        setattr(self, 'wrapped', None)
+        self._log_dir = log_dir
+
+    @property
+    def log_dir(self):
+        return self._log_dir
+
+    @log_dir.setter
+    def log_dir(self, value):
+        assert object.__getattribute__(self, 'wrapped') is None, "The SummaryWritter has already been initialized."
+        self._log_dir = value
+
+    def __getattr__(self, item):
+        if item != 'wrapped':
+            return getattr(self.wrapped, item)
+        raise AttributeError(item)
+
+    def __getattribute__(self, item):
+        res = super(LazySummaryWritter, self).__getattribute__(item)
+        if item == 'wrapped' and res is None:
+            res = SummaryWriter(self.log_dir.root)
+            atexit.register(res.close)
+            setattr(self, 'wrapped', res)
+
+        return res
