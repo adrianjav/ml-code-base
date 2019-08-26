@@ -35,7 +35,7 @@ def to_one_hot(x, size):
     return x_one_hot
 
 
-class LazySummaryWritter(object):
+class LazySummaryWriter(object):
     def __init__(self, log_dir):
         setattr(self, 'wrapped', None)
         self._log_dir = log_dir
@@ -55,7 +55,7 @@ class LazySummaryWritter(object):
         raise AttributeError(item)
 
     def __getattribute__(self, item):
-        res = super(LazySummaryWritter, self).__getattribute__(item)
+        res = super(LazySummaryWriter, self).__getattribute__(item)
         if item == 'wrapped' and res is None:
             res = SummaryWriter(self.log_dir.root)
             atexit.register(res.close)
