@@ -12,8 +12,8 @@ else:
 
 def fix_seed(seed) -> None:
     """
-    Fixes the seed of Pytorch's RNG and sets the backend (CuDNN) in deterministic mode.
-    :param seed:
+    Fixes the seed of Pytorch's RNG and put the CuDNN backend in deterministic mode.
+    :param seed: seed to be used.
     """
     if seed is not None:
         torch.backends.cudnn.deterministic = True
@@ -25,7 +25,7 @@ def to_one_hot(x, size):
     """
     Converts a tensor `x` into a one-hot representation of size `size` where x_one_hot[i] is a one hot with ones at the
     positions x[i].
-    :param x: indexes tensor.
+    :param x: tensor with the indexes of the one-elements.
     :param size: size of the resulting tensor.
     :return: the one-hot tensor.
     """
@@ -36,6 +36,10 @@ def to_one_hot(x, size):
 
 
 class LazySummaryWriter(object):
+    """
+    Lazy implementation of a SummaryWriter of Tensorboard.
+    """
+
     def __init__(self, log_dir):
         setattr(self, 'wrapped', None)
         self._log_dir = log_dir

@@ -1,3 +1,11 @@
+"""
+Module that encapsulates a series of common features faced when writing machine learning code.
+It can be summarised in the following:
+
+* A global directory system that describes the structure of your experiments.
+
+"""
+
 import os
 from typing import Optional, Any
 
@@ -5,6 +13,8 @@ from .data_structures import NestedNamespace
 from .directories import args_to_str, Directories, GlobalOptions as dirsOptions
 
 directories = Directories()
+"""Directories: Global variable that describes the structure of the experiment. 
+"""
 
 
 # Directories options
