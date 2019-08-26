@@ -24,7 +24,7 @@ def except_hook(func):  # TODO it breaks when debugging with PyCharm
     @wraps(func)
     def except_hook_(*args, **kwargs):
         sys.exit_code = None
-        func(*args, **kwargs)
+        return func(*args, **kwargs)
     return except_hook_
 
 
