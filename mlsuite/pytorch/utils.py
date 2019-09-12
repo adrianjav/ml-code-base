@@ -35,6 +35,27 @@ def to_one_hot(x, size):
     return x_one_hot
 
 
+def skip_grad(begin, end):
+    """
+    Skip a part of the computational graph when computing the gradient. The result is that instead of storing in begin
+    the gradient of the loss function wrt to begin it will store the gradient wrt end.
+
+    :param begin: beginning of the chain from which skip the computations.
+    :param end: point from which keep computating the gradient.
+    :return:
+    """
+    assert begin.size() == end.size()
+
+    res = None
+
+    def save_grad(grad):
+        nonlocal res
+        res = grad
+
+    end.register_hook(save_grad)
+    begin.register_hook(lambda grad: res)
+
+
 class LazySummaryWriter(object):
     def __init__(self, log_dir):
         setattr(self, 'wrapped', None)
