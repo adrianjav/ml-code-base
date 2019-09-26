@@ -19,5 +19,5 @@ setuptools.setup(
 #         "License :: OSI Approved :: MIT License",
          "Operating System :: OS Independent",
      ],
-    data_files=[('mlsuite', ['mlsuite/config.yaml'])]
+     include_package_data=True
  )
