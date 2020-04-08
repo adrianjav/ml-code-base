@@ -1,0 +1,16 @@
+I_have_spaces: 1
+b:
+  c:
+    hello: world
+  d: e
+device: cuda
+g:
+  one: 1
+  two: hello ${b.c.hello}
+options:
+  error_file: stderr.txt
+  exist_ok: false
+  git_hash: no-git
+  timestamp: 2020-04-08-23:12:18
+  verbose: true
+project: 4
