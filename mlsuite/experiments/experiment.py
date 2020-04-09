@@ -25,7 +25,7 @@ class TeeFile:
 
 
 def is_interactive_shell() -> bool:
-    return not sys.__stdin__.isatty()
+    return sys.__stdin__.isatty()
 
 
 def experiment(*args, **kwargs):
