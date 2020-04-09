@@ -24,6 +24,9 @@ def read_yaml_click(ctx, param, value):
     if value is not None:
         config = Arguments()
         for path in value:
+            if path.startswith('='):
+                path = path[1:]
+
             config.update(read_yaml(path))
         return config
 
