@@ -7,9 +7,9 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
      name='mlsuite',
-     version='0.1',
+     version='0.1.1',
      scripts=[] ,
-     author="Adrián Javaloy Bornás",
+     author="Adrián Javaloy",
      author_email="adrian.javaloy@gmail.com",
      description="A framework to ease Machine Learning development.",
      long_description=long_description,
@@ -21,5 +21,10 @@ setuptools.setup(
 #         "License :: OSI Approved :: MIT License",
          "Operating System :: OS Independent",
      ],
-     include_package_data=True
+     include_package_data=True,
+     install_requires=[
+         'dotmap',
+         'pyyaml',
+         'click',
+     ]
 )
