@@ -85,9 +85,6 @@ def experiment(*args, **kwargs):
                     os.makedirs(output_dir, exist_ok=arguments.options.exist_ok)
                     os.chdir(output_dir)
 
-                with open(arguments.options.config_file, 'w') as file:
-                    yaml.safe_dump(arguments.to_dict(), file)
-
                 with open(arguments.options.output_file, 'a') as out, open(arguments.options.error_file, 'a') as err:
                     if arguments.options.verbose and is_interactive_shell():
                         out_file = TeeFile(out, sys.stdout)
@@ -97,6 +94,9 @@ def experiment(*args, **kwargs):
 
                     with redirect_stdout(out_file), redirect_stderr(err_file):
                         func(arguments)
+
+                with open(arguments.options.config_file, 'w') as file:
+                    yaml.safe_dump(arguments.to_dict(), file)
 
             return wrapper
         return __experiment_decorator
