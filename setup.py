@@ -7,7 +7,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
      name='mlsuite',
-     version='0.1.3',
+     version='0.1.3.1',
      scripts=[] ,
      author="Adrián Javaloy",
      author_email="adrian.javaloy@gmail.com",
@@ -18,7 +18,7 @@ setuptools.setup(
      packages=setuptools.find_packages(),
      classifiers=[
          "Programming Language :: Python :: 3.7",
-#         "License :: OSI Approved :: MIT License",
+         # "License :: OSI Approved :: MIT License",
          "Operating System :: OS Independent",
      ],
      include_package_data=True,
