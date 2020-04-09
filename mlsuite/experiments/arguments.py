@@ -24,7 +24,7 @@ class Arguments(DotMap):
     def update(self, *args, **kwargs):
         new_kwargs = kwargs
         for item in args:
-            assert isinstance(item, dict)
+            assert isinstance(item, dict), item
             new_kwargs.update(item)
 
         new_kwargs = {key.replace(' ', '_'): self.__class__(item) if isinstance(item, dict) else item for key, item in kwargs.items()}

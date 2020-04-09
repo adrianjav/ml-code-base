@@ -1,13 +1,17 @@
 import os
 import sys
-import functools
 import subprocess
+from functools import wraps
 from datetime import datetime
 from contextlib import redirect_stdout, redirect_stderr
 
 import yaml
+import click
 
 from mlsuite.experiments.arguments import Arguments
+
+
+command = lambda func: click.command()(func)
 
 
 class TeeFile:
@@ -47,7 +51,7 @@ def experiment(*args, **kwargs):
             'verbose': True,
             'git_hash': 'no-git',
             'exist_ok': False,
-            'config_filename': 'config.yml',
+            'config_file': 'config.yml',
         })
         arguments.options.update(**kwargs)
 
@@ -62,10 +66,12 @@ def experiment(*args, **kwargs):
         arguments.options.update(timestamp=datetime.today().strftime('%Y-%m-%d-%H:%M:%S'))
 
         def __experiment_decorator(func):
-            @functools.wraps(func)
-            def wrapper(*args, config=None, **kwargs):
-                if config is not None:
-                    arguments.update(config)
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                # if 'config' in kwargs.keys():
+                #     config = kwargs.pop('config')
+                #     if config is not None:
+                #         arguments.update(config)
 
                 arguments.update(*args, **kwargs)
 
@@ -78,7 +84,7 @@ def experiment(*args, **kwargs):
                     os.makedirs(output_dir, exist_ok=arguments.options.exist_ok)
                     os.chdir(output_dir)
 
-                with open(arguments.options.config_filename, 'w') as file:
+                with open(arguments.options.config_file, 'w') as file:
                     yaml.safe_dump(arguments.to_dict(), file)
 
                 with open(arguments.options.output_file, 'a') as out, open(arguments.options.error_file, 'a') as err:
@@ -103,32 +109,31 @@ def experiment(*args, **kwargs):
         return _experiment_decorator(**kwargs)
 
 
+def CLIConfig(func):
+    """ Shortcut to read the experiment options from the command line."""
+    @click.option('--output_file', '-out', type=str, help='Output filename.')
+    @click.option('--error_file', '-err', type=str, help='Error filename.')
+    @click.option('--config_file', '-conf', type=str, help='Configuration filename.')
+    @click.option('--exists_ok', type=bool, help='Whether it is ok if the directory already exists.')
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        print(kwargs)
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
 if __name__ == '__main__':
-# if True:
-    # @experiment
-    # def foo():
-    #     print('test1')
-    # foo()
+    from mlsuite.experiments.yaml_handlers import YAMLConfig
 
-    import click
-    from mlsuite.experiments.yaml_handlers import YAMLConfig, read_yaml_click
-
-    # @YAMLConfig
-
-
-    # @click.command()
-    # @click.option('--config_file', '-c', multiple=True, help='YAML configuration file', callback=read_yaml_click)
+    @command
+    @CLIConfig
     @YAMLConfig
-    # @click.option('--algo', '-a', help='Algo', required=True)
+    @click.option('-smth', help='Something', required=False)
     @experiment(verbose=True)
     def foo(config):
         print(config)
         print('test2')
+
     foo()
-
     print('haha')
-
-    # @experiment('other')
-    # def foo():
-    #     print('test3')
-    # foo()

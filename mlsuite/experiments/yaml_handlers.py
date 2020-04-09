@@ -31,10 +31,10 @@ def YAMLConfig(func):
         You can pass as many files as you want with `-c filename1 -c filename2`. If two files define the same option
         the latter is the one that takes priority.
     """
-    @click.command()
-    @click.option('--config_file', '-c', multiple=True, help='YAML configuration file', callback=read_yaml_click)
+    # @click.command()
+    @click.option('--config', '-c', multiple=True, help='YAML configuration file', callback=read_yaml_click)
     @wraps(func)
-    def wrapper(*args, config_file, **kwargs):
-        return func(*args, **kwargs, config=config_file)
+    def wrapper(*args, config=None, **kwargs):
+        return func(config, *args, **kwargs)
 
     return wrapper
