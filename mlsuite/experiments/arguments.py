@@ -6,6 +6,8 @@ from dotmap import DotMap
 
 
 class Arguments(DotMap):
+    _parse = lambda x: x.replace(' ', '_')
+
     """ Class to handle arguments with dot notation."""
     def __init__(self, *args, **kwargs):
         super(Arguments, self).__init__(_dynamic=False)
@@ -15,27 +17,24 @@ class Arguments(DotMap):
         super(Arguments, self).__setattr__(key.replace(' ', '_'), value)
 
     def __getattr__(self, item: str) -> object:
-        item = item.replace(' ', '_')
+        item = self.__class__._parse(item)
         try:
             return super(Arguments, self).__getattr__(item)
         except KeyError as exc:
             raise AttributeError(*exc.args) from exc
 
     def update(self, *args, **kwargs):
-        new_kwargs = kwargs
         for item in args:
-            assert isinstance(item, dict), item
-            new_kwargs.update(item)
+            self.update(**item)
 
-        new_kwargs = {key.replace(' ', '_'): self.__class__(item) if isinstance(item, dict) else item for key, item in kwargs.items()}
-        to_pop = []
-        for k, v in new_kwargs.items():
-            if isinstance(v, Arguments) and isinstance(getattr(self, k, None), Arguments):
-                getattr(self, k).update(v)
-                to_pop.append(k)
+        new_kwargs = {}
+        for k, v in kwargs.items():
+            parsed_k = self.__class__._parse(k)
 
-        for k in to_pop:
-            new_kwargs.pop(k)
+            if isinstance(v, (Arguments, dict)) and isinstance(getattr(self, parsed_k, None), Arguments):
+                getattr(self, parsed_k).update(v)
+            else:
+                new_kwargs[parsed_k] = Arguments(v) if isinstance(v, dict) else v
 
         super(Arguments, self).update(**new_kwargs)
 
