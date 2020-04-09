@@ -9,6 +9,7 @@ import yaml
 import click
 
 from mlsuite.experiments.arguments import Arguments
+from mlsuite.experiments.yaml_handlers import read_yaml
 
 
 command = lambda func: click.command()(func)
@@ -29,7 +30,7 @@ class TeeFile:
 
 
 def is_interactive_shell() -> bool:
-    return not sys.__stdin__.isatty()
+    return sys.__stdin__.isatty()
 
 
 def experiment(*args, **kwargs):
@@ -69,11 +70,6 @@ def experiment(*args, **kwargs):
         def __experiment_decorator(func):
             @wraps(func)
             def wrapper(*args, **kwargs):
-                # if 'config' in kwargs.keys():
-                #     config = kwargs.pop('config')
-                #     if config is not None:
-                #         arguments.update(config)
-
                 arguments.update(*args, **kwargs)
 
                 if arguments.options.verbose and is_interactive_shell():
@@ -84,6 +80,22 @@ def experiment(*args, **kwargs):
                     output_dir = arguments.replace_placeholders(arguments.options.output_dir)
                     os.makedirs(output_dir, exist_ok=arguments.options.exist_ok)
                     os.chdir(output_dir)
+
+                # check if the configuration file exists already
+                if arguments.options.exist_ok:
+                    try:
+                        new_args = read_yaml(arguments.options.config_file)
+                        assert 'options' in new_args.keys(), 'Loaded configuration does not have options.'
+                        assert 'git_hash' in new_args['options'].keys() and 'timestamp' in new_args['options'].keys()
+                        assert new_args['options']['git_hash'] == arguments.options.git_hash, 'Different git versions.'
+
+                        options = new_args['options']
+                        new_args.pop('options')
+
+                        arguments.options.timestamp = options['timestamp']
+                        arguments.update(new_args)
+                    except FileExistsError:
+                        pass
 
                 with open(arguments.options.output_file, 'a') as out, open(arguments.options.error_file, 'a') as err:
                     if arguments.options.verbose and is_interactive_shell():
@@ -112,10 +124,10 @@ def experiment(*args, **kwargs):
 
 def CLIConfig(func):
     """ Shortcut to read the experiment options from the command line."""
-    @click.option('--output_file', '-out', type=str, help='Output filename.')
-    @click.option('--error_file', '-err', type=str, help='Error filename.')
-    @click.option('--config_file', '-conf', type=str, help='Configuration filename.')
-    @click.option('--exist_ok', type=bool, help='Whether it is ok if the directory already exists.')
+    @click.option('--output-file', '-out', type=str, help='Output filename.')
+    @click.option('--error-file', '-err', type=str, help='Error filename.')
+    @click.option('--config-file', '-conf', type=str, help='Configuration filename.')
+    @click.option('--exist-ok', type=bool, is_flag=True, help='Whether it is ok if the directory already exists.')
     @wraps(func)
     def wrapper(*args, output_file=None, error_file=None, config_file=None, exist_ok=None, **kwargs):
         options = {}

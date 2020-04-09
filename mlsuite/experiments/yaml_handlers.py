@@ -10,7 +10,10 @@ from mlsuite.experiments.arguments import Arguments
 def read_yaml(path):
     """Safely reads a YAML file and returns its content as a dictionary."""
     path = Path(path)
-    assert path.exists() and path.is_file(), f'{path} doesn\'t exist or is not a file.'
+    if not path.exists():
+        raise FileExistsError(f'{path} doesn\'t exist.')
+    if not path.is_file():
+        raise FileExistsError(f'{path} is a directory, not a file.')
 
     with path.open('r') as file:
         content = yaml.safe_load(file)
