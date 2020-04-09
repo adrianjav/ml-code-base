@@ -57,8 +57,9 @@ def experiment(*args, **kwargs):
 
         # Add git version to the config file
         try:
-            arguments.options.update(git_hash=subprocess.check_output(["git", "describe", "--always"],
-                                                              stderr=subprocess.DEVNULL).strip())
+            git_hash = subprocess.check_output(["git", "describe", "--always"],
+                                               stderr=subprocess.DEVNULL).strip().decode('ascii')
+            arguments.options.update(git_hash=git_hash)
         except subprocess.CalledProcessError:
             pass
 
@@ -114,11 +115,16 @@ def CLIConfig(func):
     @click.option('--output_file', '-out', type=str, help='Output filename.')
     @click.option('--error_file', '-err', type=str, help='Error filename.')
     @click.option('--config_file', '-conf', type=str, help='Configuration filename.')
-    @click.option('--exists_ok', type=bool, help='Whether it is ok if the directory already exists.')
+    @click.option('--exist_ok', type=bool, help='Whether it is ok if the directory already exists.')
     @wraps(func)
-    def wrapper(*args, **kwargs):
-        print(kwargs)
-        return func(*args, **kwargs)
+    def wrapper(*args, output_file=None, error_file=None, config_file=None, exist_ok=None, **kwargs):
+        options = {}
+        if output_file is not None: options['output_file'] = output_file
+        if error_file is not None: options['error_file'] = error_file
+        if config_file is not None: options['config_file'] = config_file
+        if exist_ok is not None: options['exist_ok'] = exist_ok
+
+        return func(Arguments(options=options), *args, **kwargs)
 
     return wrapper
 
