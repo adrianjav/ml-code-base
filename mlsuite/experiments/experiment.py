@@ -25,7 +25,7 @@ class TeeFile:
 
 
 def is_interactive_shell() -> bool:
-    return sys.__stdin__.isatty()
+    return not sys.__stdin__.isatty()
 
 
 def experiment(*args, **kwargs):
@@ -67,6 +67,8 @@ def experiment(*args, **kwargs):
                 if config is not None:
                     arguments.update(config)
 
+                arguments.update(*args, **kwargs)
+
                 if arguments.options.verbose and is_interactive_shell():
                     print(arguments.to_dict(), file=sys.stderr)
 
@@ -87,7 +89,7 @@ def experiment(*args, **kwargs):
                         out_file, err_file = out, err
 
                     with redirect_stdout(out_file), redirect_stderr(err_file):
-                        func(*args, config=arguments, **kwargs)
+                        func(arguments)
 
             return wrapper
         return __experiment_decorator
@@ -102,19 +104,29 @@ def experiment(*args, **kwargs):
 
 
 if __name__ == '__main__':
+# if True:
     # @experiment
     # def foo():
     #     print('test1')
     # foo()
 
-    from mlsuite.experiments.yaml_handlers import YAMLConfig
+    import click
+    from mlsuite.experiments.yaml_handlers import YAMLConfig, read_yaml_click
 
+    # @YAMLConfig
+
+
+    # @click.command()
+    # @click.option('--config_file', '-c', multiple=True, help='YAML configuration file', callback=read_yaml_click)
     @YAMLConfig
+    # @click.option('--algo', '-a', help='Algo', required=True)
     @experiment(verbose=True)
     def foo(config):
         print(config)
         print('test2')
-    # foo()
+    foo()
+
+    print('haha')
 
     # @experiment('other')
     # def foo():

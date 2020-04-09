@@ -1,4 +1,5 @@
 from pathlib import Path
+from functools import wraps
 
 import yaml
 import click
@@ -16,6 +17,14 @@ def read_yaml(path):
         return content
 
 
+def read_yaml_click(ctx, param, value):
+    if value is not None:
+        config = Arguments()
+        for path in value:
+            config.update(read_yaml(path))
+        return config
+
+
 def YAMLConfig(func):
     """ Reads YAML filenames as arguments of the command line, parses them, and pass the dictionary.
 
@@ -23,11 +32,9 @@ def YAMLConfig(func):
         the latter is the one that takes priority.
     """
     @click.command()
-    @click.option('--config_file', '-c', multiple=True, help='YAML configuration file')
+    @click.option('--config_file', '-c', multiple=True, help='YAML configuration file', callback=read_yaml_click)
+    @wraps(func)
     def wrapper(*args, config_file, **kwargs):
-        config = Arguments()
-        for filename in config_file:
-            config.update(read_yaml(filename))
+        return func(*args, **kwargs, config=config_file)
 
-        return func(*args, **kwargs, config=config)
-    return wrapper()
+    return wrapper
