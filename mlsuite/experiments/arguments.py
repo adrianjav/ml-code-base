@@ -52,10 +52,10 @@ class Arguments(DotMap):
             value = self
             for item in request:
                 value = getattr(value, item)
-            assert isinstance(value, str), f'pattern {match.group()} failed.'
+            assert not isinstance(value, Arguments), f'pattern {match.group()} failed.'
 
-            result += pattern[:match.start()] + value
-            pos = match.end() + 1
+            result += pattern[pos:match.start()] + str(value)
+            pos = match.end()
 
         result += pattern[pos:]
         return result
