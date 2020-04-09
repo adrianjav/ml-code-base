@@ -6,9 +6,9 @@ from dotmap import DotMap
 
 
 class Arguments(DotMap):
+    """ Class to handle arguments with dot notation."""
     _parse = lambda x: x.replace(' ', '_')
 
-    """ Class to handle arguments with dot notation."""
     def __init__(self, *args, **kwargs):
         super(Arguments, self).__init__(_dynamic=False)
         self.update(*args, **kwargs)
