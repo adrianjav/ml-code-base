@@ -72,10 +72,12 @@ def experiment(*args, **kwargs):
             def wrapper(*args, **kwargs):
                 arguments.update(*args, **kwargs)
 
+                arguments.update(pwd=os.getcwd())
+
                 if arguments.options.verbose and is_interactive_shell():
                     print(arguments.to_dict(), file=sys.stderr)
 
-                if arguments.options.output_dir != '.':
+                if arguments.options.output_dir != '.':  # debugging purposes
                     # Create the project folder and change the working directory
                     output_dir = arguments.replace_placeholders(arguments.options.output_dir)
                     os.makedirs(output_dir, exist_ok=arguments.options.exist_ok)
@@ -108,6 +110,7 @@ def experiment(*args, **kwargs):
                         func(arguments)
 
                 with open(arguments.options.config_file, 'w') as file:
+                    arguments.pop('pwd')
                     yaml.safe_dump(arguments.to_dict(), file)
 
             return wrapper
