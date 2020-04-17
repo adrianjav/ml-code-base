@@ -17,7 +17,7 @@ def read_yaml(path):
 
     with path.open('r') as file:
         content = yaml.safe_load(file)
-        return content
+        return content if content is not None else {}
 
 
 def read_yaml_click(ctx, param, value):
