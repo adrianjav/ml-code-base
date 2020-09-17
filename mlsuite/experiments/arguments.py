@@ -39,10 +39,11 @@ class Arguments(DotMap):
     def to_dict(self) -> dict:
         return self.toDict()
 
-    def replace_placeholders(self, pattern: str) -> str:
+    def replace_placeholders(self, pattern: str, recurse=True) -> str:
         """ Returns project string where placeholders of the form `${nested.key}` replaced by their value.
 
         :param pattern: string with the placeholders
+        :param recurse: whether or not to keep replacing the string until exhausted
         :return: project string like pattern with the proper value of the placeholders.
         """
 
@@ -54,7 +55,7 @@ class Arguments(DotMap):
                 value = getattr(value, item)
             assert not isinstance(value, Arguments), f'pattern {match.group()} failed.'
 
-            result += pattern[pos:match.start()] + str(value)
+            result += pattern[pos:match.start()] + (self.replace_placeholders(value) if recurse and type(value) == str else str(value))
             pos = match.end()
 
         result += pattern[pos:]
