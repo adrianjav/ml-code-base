@@ -2,7 +2,7 @@ import re
 
 from dotmap import DotMap
 
-from options import GlobalOptions
+from mlsuite.options import GlobalOptions
 
 
 def _parse(x):
@@ -40,6 +40,7 @@ class Arguments(DotMap):
         except KeyError as exc:
             raise AttributeError(*exc.args) from exc
 
+    @GlobalOptions.replace_placeholders(False)
     def update(self, *args, **kwargs):
         for item in args:
             self.update(**item)

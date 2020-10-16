@@ -8,8 +8,8 @@ from contextlib import redirect_stdout, redirect_stderr
 import yaml
 import click
 
-from mlsuite.experiments.arguments import ArgumentsHeader as Arguments
-from mlsuite.experiments.yaml_handlers import read_yaml
+from mlsuite.experiments.arguments import ArgumentsHeader, Arguments
+from mlsuite.experiments.yaml_handlers import read_yaml, YAMLConfig
 
 
 class TeeFile:
@@ -42,7 +42,7 @@ def experiment_wrapper(*args, **kwargs):
         6. If verbose=True and it is running in an interactive terminal it also outputs to the terminal.
     """
     def _experiment_decorator(**kwargs):
-        arguments = Arguments(options={
+        arguments = ArgumentsHeader(options={
             'output_dir': '.',
             'default_dirs': [],
             'output_file': 'stdout.txt',
@@ -73,9 +73,6 @@ def experiment_wrapper(*args, **kwargs):
 
                     arguments.update(pwd=os.getcwd())
 
-                    if arguments.options.verbose and is_interactive_shell():
-                        print(arguments.to_dict(), file=sys.stderr)
-
                     # Create the project folder and change the working directory
                     output_dir = str(arguments.options.output_dir)
                     os.makedirs(output_dir, exist_ok=arguments.options.exist_ok)
@@ -100,6 +97,9 @@ def experiment_wrapper(*args, **kwargs):
                         except FileExistsError:
                             pass
 
+                    if arguments.options.verbose and is_interactive_shell():
+                        print(arguments.to_dict(), file=sys.stderr)
+
                     with open(arguments.options.output_file, 'a') as out, open(arguments.options.error_file, 'a') as err:
                         if arguments.options.verbose and is_interactive_shell():
                             out_file = TeeFile(out, sys.stdout)
@@ -111,7 +111,7 @@ def experiment_wrapper(*args, **kwargs):
                             func(arguments)
 
                 except Exception as e:
-                    arguments.update({'exception thrown': str(e)})
+                    arguments.update({'exception thrown': f'"{type(e).__name__}: {str(e)}"'})
                     raise e
 
                 finally:
@@ -180,8 +180,6 @@ def experiment(*args, **kwargs):
 
 
 if __name__ == '__main__':
-    from mlsuite.experiments.yaml_handlers import YAMLConfig
-
     # @click.option('-smth', help='Something', required=False)
     # @command
     # @CLIConfig

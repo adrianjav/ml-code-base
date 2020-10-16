@@ -5,7 +5,7 @@ import yaml
 import click
 from yaml.representer import SafeRepresenter
 
-from mlsuite.experiments.arguments import LazyString, ArgumentsHeader as Arguments
+from mlsuite.experiments.arguments import LazyString, Arguments
 
 yaml.add_representer(LazyString, SafeRepresenter.represent_str, yaml.SafeDumper)
 

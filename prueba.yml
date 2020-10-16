@@ -1,0 +1,9 @@
+variable: 4
+
+model type: cluster
+model:
+ num clusters: ${variable}
+
+dataset:
+ name: mydataset
+ extra: {}
