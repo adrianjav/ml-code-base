@@ -1,6 +1,6 @@
-from .experiments import Arguments, YAMLConfig, read_yaml_click, experiment_wrapper, CLIConfig, command
-from options import GlobalOptions, Options
+from .experiments import Arguments, YAMLConfig, experiment, experiment_wrapper, CLIConfig, command
+from options import GlobalOptions
 
 
-__all__ = ['Arguments', 'YAMLConfig', 'read_yaml_click', 'experiment_wrapper', 'CLIConfig', 'command']
+__all__ = ['Arguments', 'YAMLConfig', 'experiment', 'experiment_wrapper', 'CLIConfig', 'command', 'GlobalOptions']
 
