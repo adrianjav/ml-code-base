@@ -1,3 +1,3 @@
-from .utils import timed, keyboard_stopable
+from .utils import timed, keyboard_stoppable
 
-__all__ = ['timed', 'keyboard_stopable']
+__all__ = ['timed', 'keyboard_stoppable']
