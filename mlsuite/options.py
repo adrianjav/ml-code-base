@@ -2,6 +2,12 @@ from functools import partial, wraps
 
 
 def with_stmt(outer_func):
+    """
+    Takes a function an returns a context manager that can be used as decorator and in a with statement.
+
+    :param outer_func Function that works as a setter/getter when some/no arguments are passed to it.
+    """
+
     class CM(object):
         def __init__(self, *args, **kwargs):
             self.args = args
@@ -31,35 +37,6 @@ def with_stmt(outer_func):
     return CM
 
 
-def getstate(self):
-    state = self.__dict__
-    for attr in [v for v in dir(self) if v.startswith('_opt_')]:
-        if attr[len('_opt_'):] in state.keys():
-            state.pop(attr[len('_opt_'):])
-    return state
-
-
-def safe_getstate(getstate):
-    def safe_getstate_(self):
-        import inspect  # TODO temporary
-
-        new_state = {'state': getstate(self)}
-        new_state.update({k: v for k, v in inspect.getmembers(self) if k.startswith('_opt_')})
-
-        return new_state
-    return safe_getstate_
-
-
-def safe_setstate(setstate):
-    def safe_setstate_(self, state):
-        for k, v in state.items():
-            if k.startswith('_opt_'):
-                setattr(self, k, v)
-
-        setstate(self, state['state'])
-    return safe_setstate_
-
-
 class Options(type):
     def __init__(cls, name, bases, namespace):
         super(Options, cls).__init__(name, bases, namespace)
@@ -72,42 +49,10 @@ class Options(type):
         for attr in [x for x in namespace if x.startswith('_opt_')]:
             setattr(cls, attr[len('_opt_'):], with_stmt(partial(getter, cls, attr)))
 
-        setattr(cls, '__getstate__', safe_getstate(getattr(cls, '__getstate__', getstate)))  # can't pickle CM
-        setattr(cls, '__setstate__', safe_setstate(getattr(cls, '__setstate__', lambda s, d: s.__dict__.update(d))))
 
-    def decorate(cls, instance):
+class GlobalOptions(metaclass=Options):
+    # _opt_inherit_on_creation = False
+    # _opt_load_on_init = True
+    # _opt_save_on_del = True
+    _opt_replace_placeholders = True
 
-        def getter(self, name, value=None, reset=False):
-            assert not reset or (reset and not value)
-
-            if reset:
-                setattr(self, name, None)
-
-            if value is not None:
-                setattr(self, name, value)
-
-            return getattr(self, name)
-
-        def real_value(self, name, value=None, reset=None):
-            assert not reset or (reset and not value)
-
-            if reset:
-                setattr(self, name, None)
-
-            if value is not None:
-                setattr(self, name, value)
-            else:
-                value = getattr(self, name)
-
-            supervalue = getattr(super(type(self), self), name[len('_opt_'):]).value()
-            return value if value is not None else supervalue
-
-        for attr in [x for x in dir(cls) if x.startswith('_opt_')]:
-            setattr(instance, attr, None)
-            setattr(instance, attr[len('_opt_'):], with_stmt(partial(getter, instance, attr)))
-            getattr(instance, attr[len('_opt_'):]).value = staticmethod(partial(real_value, instance, attr))
-
-    def __call__(cls, *args, **kwargs):
-        instance = super(Options, cls).__call__(*args, **kwargs)
-        cls.decorate(instance)
-        return instance

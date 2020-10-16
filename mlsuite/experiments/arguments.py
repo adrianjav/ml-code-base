@@ -2,20 +2,39 @@ import re
 
 from dotmap import DotMap
 
+from options import GlobalOptions
+
+
+def _parse(x):
+    return x.replace(' ', '_')
+
+
+class LazyString(str):
+    """Wrapper class to replace placeholders in the argument's strings"""
+    _root = None
+
+    def __str__(self):
+        if GlobalOptions.replace_placeholders.value():
+            return type(self)._root.replace_placeholders(self, recurse=True)
+
+        return self
+
+    def __repr__(self):
+        # with GlobalOptions.replace_placeholders(False):
+        return str(self)
+
 
 class Arguments(DotMap):
     """ Class to handle arguments with dot notation."""
-    _parse = lambda x: x.replace(' ', '_')
-
     def __init__(self, *args, **kwargs):
         super(Arguments, self).__init__(_dynamic=False)
         self.update(*args, **kwargs)
 
     def __setattr__(self, key, value):
-        super(Arguments, self).__setattr__(key.replace(' ', '_'), value)
+        super(Arguments, self).__setattr__(_parse(key), value if not isinstance(value, str) else LazyString(value))
 
     def __getattr__(self, item: str) -> object:
-        item = self.__class__._parse(item)
+        item = _parse(item)
         try:
             return super(Arguments, self).__getattr__(item)
         except KeyError as exc:
@@ -27,12 +46,17 @@ class Arguments(DotMap):
 
         new_kwargs = {}
         for k, v in kwargs.items():
-            parsed_k = self.__class__._parse(k)
+            parsed_k = _parse(k)
 
             if isinstance(v, (Arguments, dict)) and isinstance(getattr(self, parsed_k, None), Arguments):
                 getattr(self, parsed_k).update(v)
             else:
-                new_kwargs[parsed_k] = Arguments(v) if isinstance(v, dict) else v
+                if isinstance(v, dict):
+                    v = Arguments(v)
+                elif isinstance(v, str):
+                    v = LazyString(v)
+
+                new_kwargs[parsed_k] = v
 
         super(Arguments, self).update(**new_kwargs)
 
@@ -55,15 +79,22 @@ class Arguments(DotMap):
                 value = getattr(value, item)
             assert not isinstance(value, Arguments), f'pattern {match.group()} failed.'
 
-            result += pattern[pos:match.start()] + (self.replace_placeholders(value) if recurse and type(value) == str else str(value))
+            result += pattern[pos:match.start()] + (self.replace_placeholders(value) if recurse and isinstance(value, str) else str(value))
             pos = match.end()
 
         result += pattern[pos:]
         return result
 
 
+class ArgumentsHeader(Arguments):
+    """Dummy class for the root of the arguments"""
+    def __init__(self, *args, **kwargs):
+        super(ArgumentsHeader, self).__init__(*args, **kwargs)
+        LazyString._root = self
+
+
 if __name__ == '__main__':
-    args = Arguments()
+    args = ArgumentsHeader()
     args.update({'I have spaces': 1, 'b': {'c': 2, 'd': 'e'}})
     print(args)
     print(args.I_have_spaces)
@@ -78,11 +109,27 @@ if __name__ == '__main__':
     print(hasattr(args, 'e'))
 
     args.update({'g': {'one': 1, 'two': 'hello ${b.c.hello}'}, 'project': 4})
-    print(args)
 
-    print(args.replace_placeholders(args.g.two))
+    print(type(LazyString('prueba')).__mro__)
+
+    print('='*10)
+    with GlobalOptions.replace_placeholders(False):
+        print(args)
+    print(dict(args))
+    print(args.to_dict())
+    print(args.g.two)
+    # args.g.two += ' of warcraft'
+    # print(args.g.two)
+    # args.g.two += ' (${I_have_spaces})'
+    print(args.g.two)
+    with GlobalOptions.replace_placeholders(False):
+        print(args.to_dict())
+    print('=' * 10)
 
     import yaml
+    from yaml.representer import SafeRepresenter
+    yaml.add_representer(LazyString, SafeRepresenter.represent_str, yaml.SafeDumper)
+
     with open('args_test.yml', 'w') as f:
         yaml.safe_dump(args.to_dict(), f)
 

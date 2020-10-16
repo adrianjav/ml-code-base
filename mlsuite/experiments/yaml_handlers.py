@@ -3,8 +3,11 @@ from functools import wraps
 
 import yaml
 import click
+from yaml.representer import SafeRepresenter
 
-from mlsuite.experiments.arguments import Arguments
+from mlsuite.experiments.arguments import LazyString, ArgumentsHeader as Arguments
+
+yaml.add_representer(LazyString, SafeRepresenter.represent_str, yaml.SafeDumper)
 
 
 def read_yaml(path):
@@ -21,14 +24,15 @@ def read_yaml(path):
 
 
 def read_yaml_click(ctx, param, value):
+    config = Arguments()
     if value is not None:
-        config = Arguments()
         for path in value:
             if path.startswith('='):
                 path = path[1:]
 
             config.update(read_yaml(path))
-        return config
+
+    return config
 
 
 def YAMLConfig(func):
@@ -38,7 +42,7 @@ def YAMLConfig(func):
         the latter is the one that takes priority.
     """
     # @click.command()
-    @click.option('--config', '-c', multiple=True, type=click.Path(exists=False, dir_okay=False),  # TODO fix this exists
+    @click.option('--config', '-c', multiple=True, type=click.Path(exists=True, dir_okay=False),
                   help='YAML configuration file', callback=read_yaml_click)
     @wraps(func)
     def wrapper(*args, config=None, **kwargs):

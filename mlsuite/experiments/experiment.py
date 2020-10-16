@@ -8,11 +8,8 @@ from contextlib import redirect_stdout, redirect_stderr
 import yaml
 import click
 
-from mlsuite.experiments.arguments import Arguments
+from mlsuite.experiments.arguments import ArgumentsHeader as Arguments
 from mlsuite.experiments.yaml_handlers import read_yaml
-
-
-command = lambda func: click.command()(func)
 
 
 class TeeFile:
@@ -33,7 +30,7 @@ def is_interactive_shell() -> bool:
     return sys.__stdin__.isatty()
 
 
-def experiment(*args, **kwargs):
+def experiment_wrapper(*args, **kwargs):
     """Automatises the usual boilerplate from experiments.
 
     In particular:
@@ -47,6 +44,7 @@ def experiment(*args, **kwargs):
     def _experiment_decorator(**kwargs):
         arguments = Arguments(options={
             'output_dir': '.',
+            'default_dirs': [],
             'output_file': 'stdout.txt',
             'error_file': 'stderr.txt',
             'verbose': True,
@@ -70,48 +68,56 @@ def experiment(*args, **kwargs):
         def __experiment_decorator(func):
             @wraps(func)
             def wrapper(*args, **kwargs):
-                arguments.update(*args, **kwargs)
+                try:
+                    arguments.update(*args, **kwargs)
 
-                arguments.update(pwd=os.getcwd())
+                    arguments.update(pwd=os.getcwd())
 
-                if arguments.options.verbose and is_interactive_shell():
-                    print(arguments.to_dict(), file=sys.stderr)
+                    if arguments.options.verbose and is_interactive_shell():
+                        print(arguments.to_dict(), file=sys.stderr)
 
-                if arguments.options.output_dir != '.':  # debugging purposes
                     # Create the project folder and change the working directory
-                    output_dir = arguments.replace_placeholders(arguments.options.output_dir)
+                    output_dir = str(arguments.options.output_dir)
                     os.makedirs(output_dir, exist_ok=arguments.options.exist_ok)
                     os.chdir(output_dir)
 
-                # check if the configuration file exists already
-                if arguments.options.exist_ok:
-                    try:
-                        new_args = read_yaml(arguments.options.config_file)
-                        assert 'options' in new_args.keys(), 'Loaded configuration does not have options.'
-                        assert 'git_hash' in new_args['options'].keys() and 'timestamp' in new_args['options'].keys()
-                        assert new_args['options']['git_hash'] == arguments.options.git_hash, 'Different git versions.'
+                    for dir in arguments.options.default_dirs:
+                        os.makedirs(str(dir), exist_ok=arguments.options.exist_ok)
 
-                        options = new_args['options']
-                        new_args.pop('options')
+                    # check if the configuration file exists already
+                    if arguments.options.exist_ok:
+                        try:
+                            new_args = read_yaml(arguments.options.config_file)
+                            assert 'options' in new_args.keys(), 'Loaded configuration does not have options.'
+                            assert 'git_hash' in new_args['options'].keys() and 'timestamp' in new_args['options'].keys()
+                            assert new_args['options']['git_hash'] == arguments.options.git_hash, 'Different git versions.'
 
-                        arguments.options.timestamp = options['timestamp']
-                        arguments.update(new_args)
-                    except FileExistsError:
-                        pass
+                            options = new_args['options']
+                            new_args.pop('options')
 
-                with open(arguments.options.output_file, 'a') as out, open(arguments.options.error_file, 'a') as err:
-                    if arguments.options.verbose and is_interactive_shell():
-                        out_file = TeeFile(out, sys.stdout)
-                        err_file = TeeFile(err, sys.stderr)
-                    else:
-                        out_file, err_file = out, err
+                            arguments.options.timestamp = options['timestamp']
+                            arguments.update(new_args)
+                        except FileExistsError:
+                            pass
 
-                    with redirect_stdout(out_file), redirect_stderr(err_file):
-                        func(arguments)
+                    with open(arguments.options.output_file, 'a') as out, open(arguments.options.error_file, 'a') as err:
+                        if arguments.options.verbose and is_interactive_shell():
+                            out_file = TeeFile(out, sys.stdout)
+                            err_file = TeeFile(err, sys.stderr)
+                        else:
+                            out_file, err_file = out, err
 
-                with open(arguments.options.config_file, 'w') as file:
-                    arguments.pop('pwd')
-                    yaml.safe_dump(arguments.to_dict(), file)
+                        with redirect_stdout(out_file), redirect_stderr(err_file):
+                            func(arguments)
+
+                except Exception as e:
+                    arguments.update({'exception thrown': str(e)})
+                    raise e
+
+                finally:
+                    with open(arguments.options.config_file, 'w') as file:
+                        arguments.pop('pwd')
+                        yaml.safe_dump(arguments.to_dict(), file)
 
             return wrapper
         return __experiment_decorator
@@ -127,10 +133,12 @@ def experiment(*args, **kwargs):
 
 def CLIConfig(func):
     """ Shortcut to read the experiment options from the command line."""
+    @click.option('--output-dir', '-dir', type=click.Path(exists=False, dir_okay=True), help='Output directory.')
     @click.option('--output-file', '-out', type=str, help='Output filename.')
     @click.option('--error-file', '-err', type=str, help='Error filename.')
     @click.option('--config-file', '-conf', type=str, help='Configuration filename.')
     @click.option('--exist-ok', type=bool, is_flag=True, help='Whether it is ok if the directory already exists.')
+    @click.option('--verbose', is_flag=True)
     @wraps(func)
     def wrapper(*args, output_file=None, error_file=None, config_file=None, exist_ok=None, **kwargs):
         options = {}
@@ -144,17 +152,54 @@ def CLIConfig(func):
     return wrapper
 
 
+def command(func):
+    return click.command()(func)
+
+
+def experiment(*args, **kwargs):
+
+    def wrapper(**kwargs):
+        def _wrapper(func):
+            @command
+            @CLIConfig
+            @YAMLConfig
+            @experiment_wrapper(**kwargs)
+            @wraps(func)
+            def __wrapper(*args, **kwargs):
+                func(*args, **kwargs)
+
+            return __wrapper
+
+        return _wrapper
+
+    if len(args) == 1 and callable(args[0]):
+        assert len(kwargs) == 0
+        return wrapper()(args[0])
+    else:
+        return wrapper(**kwargs)
+
+
 if __name__ == '__main__':
     from mlsuite.experiments.yaml_handlers import YAMLConfig
 
-    @command
-    @CLIConfig
-    @YAMLConfig
+    # @click.option('-smth', help='Something', required=False)
+    # @command
+    # @CLIConfig
+    # @YAMLConfig
+    # @experiment_wrapper(verbose=True)
+    # def foo(config):
+    #     print(config.to_dict())
+    #     print('test2')
+    #     print('test', file=sys.stderr)
+    #     # raise Exception('esto es un fallo')
+
     @click.option('-smth', help='Something', required=False)
-    @experiment(verbose=True)
+    @experiment(verbose=True, output_dir='result', default_dirs=['plots', 'checkpoints'])
     def foo(config):
-        print(config)
+        print(config.to_dict())
         print('test2')
+        print('test', file=sys.stderr)
+        # raise Exception('esto es un fallo')
 
     foo()
     print('haha')
