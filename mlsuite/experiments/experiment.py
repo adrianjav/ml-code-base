@@ -43,7 +43,7 @@ def experiment_wrapper(*args, **kwargs):
     """
     def _experiment_decorator(**kwargs):
         arguments = ArgumentsHeader(options={
-            'output_dir': '.',
+            'output_dir': 'results', #'.',
             'default_dirs': [],
             'output_file': 'stdout.txt',
             'error_file': 'stderr.txt',
@@ -70,8 +70,9 @@ def experiment_wrapper(*args, **kwargs):
             def wrapper(*args, **kwargs):
                 try:
                     arguments.update(*args, **kwargs)
-
                     arguments.update(pwd=os.getcwd())
+
+                    assert arguments.options.output_dir != '.', 'Do not use . as output directory please.'
 
                     # Create the project folder and change the working directory
                     output_dir = str(arguments.options.output_dir)
@@ -140,12 +141,13 @@ def CLIConfig(func):
     @click.option('--exist-ok', type=bool, is_flag=True, help='Whether it is ok if the directory already exists.')
     @click.option('--verbose', is_flag=True)
     @wraps(func)
-    def wrapper(*args, output_file=None, error_file=None, config_file=None, exist_ok=None, **kwargs):
+    def wrapper(*args, output_dir=None, output_file=None, error_file=None, config_file=None, exist_ok=None, **kwargs):
         options = {}
         if output_file is not None: options['output_file'] = output_file
         if error_file is not None: options['error_file'] = error_file
         if config_file is not None: options['config_file'] = config_file
         if exist_ok is not None: options['exist_ok'] = exist_ok
+        if output_dir is not None: options['output_dir'] = output_dir
 
         return func(Arguments(options=options), *args, **kwargs)
 
