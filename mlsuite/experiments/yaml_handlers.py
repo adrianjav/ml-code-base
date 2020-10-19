@@ -42,7 +42,7 @@ def YAMLConfig(func):
         the latter is the one that takes priority.
     """
     # @click.command()
-    @click.option('--config', '-c', multiple=True, type=click.Path(exists=True, dir_okay=False),
+    @click.option('--config', '-c', multiple=True, type=click.Path(exists=False, dir_okay=False),
                   help='YAML configuration file', callback=read_yaml_click)
     @wraps(func)
     def wrapper(*args, config=None, **kwargs):
