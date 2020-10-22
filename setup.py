@@ -7,7 +7,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
      name='mlsuite',
-     version='0.1.3.5',
+     version='0.1.3.6',
      scripts=[],
      author="Adrián Javaloy",
      author_email="adrian.javaloy@gmail.com",

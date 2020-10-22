@@ -43,7 +43,7 @@ def experiment_wrapper(*args, **kwargs):
     """
     def _experiment_decorator(**kwargs):
         arguments = ArgumentsHeader(options={
-            'output_dir': 'results', #'.',
+            'output_dir': 'results',  # '.',
             'default_dirs': [],
             'output_file': 'stdout.txt',
             'error_file': 'stderr.txt',
@@ -138,7 +138,7 @@ def CLIConfig(func):
     @click.option('--output-file', '-out', type=str, help='Output filename.')
     @click.option('--error-file', '-err', type=str, help='Error filename.')
     @click.option('--config-file', '-conf', type=str, help='Configuration filename.')
-    @click.option('--exist-ok', type=bool, is_flag=True, help='Whether it is ok if the directory already exists.')
+    @click.option('--exist-ok', type=bool, default=None, help='Whether it is ok if the directory already exists.')
     @click.option('--verbose', is_flag=True)
     @wraps(func)
     def wrapper(*args, output_dir=None, output_file=None, error_file=None, config_file=None, exist_ok=None, **kwargs):
